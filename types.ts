@@ -1,10 +1,11 @@
 export interface LogMessage {
   id: string;
-  role: 'user' | 'model' | 'system';
+  role: 'user' | 'model' | 'system' | 'date-marker';
   text: string;
   timestamp: Date;
   translated?: boolean;
   isError?: boolean;
+  speakerId?: string; // The ID assigned by AI (e.g., "Spanish Speaker 1")
 }
 
 export enum AppMode {

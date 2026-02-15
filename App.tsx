@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { 
   Mic, MicOff, Settings as SettingsIcon, Globe, 
-  Sparkles, Volume2, Lock, Bluetooth, Radio, FileText, FileX, AlertCircle
+  Sparkles, Lock, Radio, FileText, FileX, AlertCircle,
+  Clock, Edit2, Check, User
 } from 'lucide-react';
 
 import Visualizer from './components/Visualizer';
@@ -48,16 +49,22 @@ const App: React.FC = () => {
   const [activeMode, setActiveMode] = useState<AppMode>(AppMode.LIVE_TRANSLATOR);
   const [isRecording, setIsRecording] = useState(false);
   const [isPocketMode, setIsPocketMode] = useState(false);
-  const [showTranscript, setShowTranscript] = useState(true); // New Toggle State
+  const [showTranscript, setShowTranscript] = useState(true);
   const [logs, setLogs] = useState<LogMessage[]>([]);
   const [showSettings, setShowSettings] = useState(false);
   const [settings, setSettings] = useState<Settings>({
     targetLanguage: 'English',
     voice: 'Puck',
     autoSpeak: true,
-    noiseCancellationLevel: 'high', // Default to High for typical phone use cases
+    noiseCancellationLevel: 'high',
   });
   const [connectedMics, setConnectedMics] = useState<number>(0);
+
+  // --- Speaker Registry State ---
+  // Maps "Spanish Speaker 1" (ID) -> "Maria" (User assigned name)
+  const [speakerRegistry, setSpeakerRegistry] = useState<Record<string, string>>({});
+  const [editingSpeakerId, setEditingSpeakerId] = useState<string | null>(null);
+  const [tempSpeakerName, setTempSpeakerName] = useState('');
 
   // --- Refs for Audio & API ---
   const audioContextInput = useRef<AudioContext | null>(null);
@@ -143,15 +150,43 @@ const App: React.FC = () => {
   }, [isRecording]);
 
   // --- Helper: Add Log ---
-  const addLog = (role: 'user' | 'model' | 'system', text: string, isError: boolean = false) => {
+  const addLog = (
+    role: 'user' | 'model' | 'system' | 'date-marker', 
+    text: string, 
+    isError: boolean = false,
+    speakerId?: string
+  ) => {
     setLogs((prev) => [
       ...prev,
-      { id: Date.now().toString() + Math.random(), role, text, timestamp: new Date(), isError }
+      { 
+        id: Date.now().toString() + Math.random(), 
+        role, 
+        text, 
+        timestamp: new Date(), 
+        isError,
+        speakerId
+      }
     ]);
   };
 
+  // --- Speaker Management ---
+  const handleSpeakerClick = (id: string) => {
+    const currentName = speakerRegistry[id] || id;
+    setTempSpeakerName(currentName);
+    setEditingSpeakerId(id);
+  };
+
+  const saveSpeakerName = () => {
+    if (editingSpeakerId && tempSpeakerName.trim()) {
+      setSpeakerRegistry(prev => ({
+        ...prev,
+        [editingSpeakerId]: tempSpeakerName.trim()
+      }));
+      setEditingSpeakerId(null);
+    }
+  };
+
   // --- AUDIO FUSION SYSTEM ---
-  // Connects to ALL available microphones and mixes them
   const initializeMultiInputAudio = async (ctx: AudioContext): Promise<ScriptProcessorNode> => {
     let devices: MediaDeviceInfo[] = [];
     try {
@@ -161,19 +196,15 @@ const App: React.FC = () => {
     }
     
     const audioInputDevices = devices.filter(d => d.kind === 'audioinput');
-    
-    // Deduplicate logic: prioritize unique deviceIds.
-    // Filter out default/communications if specific devices exist to avoid duplicate streams of same hardware.
     const specificDevices = audioInputDevices.filter(d => d.deviceId !== 'default' && d.deviceId !== 'communications');
     const devicesToTry = specificDevices.length > 0 ? specificDevices : audioInputDevices;
 
-    const merger = ctx.createChannelMerger(1); // Mix all inputs to mono for the AI
+    const merger = ctx.createChannelMerger(1); 
     let streamCount = 0;
     
     const audioConstraints = getAudioConstraints(settings.noiseCancellationLevel);
     addLog('system', `Scanning hardware... Found ${devicesToTry.length} potential sensors.`);
 
-    // Attempt to open every single microphone found
     const promises = devicesToTry.map(async (device) => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -194,7 +225,6 @@ const App: React.FC = () => {
 
     await Promise.all(promises);
 
-    // Fallback: If strict multi-device failed (common on mobile OS restriction), get default
     if (streamCount === 0) {
        try {
          const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -217,10 +247,9 @@ const App: React.FC = () => {
     }
 
     setConnectedMics(streamCount);
-
     const processor = ctx.createScriptProcessor(4096, 1, 1);
     merger.connect(processor);
-    processor.connect(ctx.destination); // Needed for processing to flow, but mute output handled by ctx destination usually
+    processor.connect(ctx.destination);
     
     return processor;
   };
@@ -231,6 +260,10 @@ const App: React.FC = () => {
     if (isRecording) return;
 
     try {
+      // Add Date Marker at start of session
+      const dateStr = new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      addLog('date-marker', dateStr);
+      
       addLog('system', `Initializing Neural Interface...`);
       await requestWakeLock();
       
@@ -242,45 +275,31 @@ const App: React.FC = () => {
       await audioContextInput.current.resume();
       await audioContextOutput.current.resume();
 
-      // Initialize Multi-Mic Fusion
       const processor = await initializeMultiInputAudio(audioContextInput.current);
       processorRef.current = processor;
 
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
-      // EVOLUTIONARY AI INSTRUCTION
       const translatorInstruction = `
-        You are "ListeningProject", a self-evolving, adaptive linguistic intelligence.
-        
-        **INPUT DATA:**
-        - You are receiving a fused audio stream from **${connectedMics} separate microphones**.
-        - Triangulate the clearest voice signal.
-        - The user is in "Stealth Mode".
+        You are "ListeningProject".
         
         **CORE PROTOCOLS:**
-        1.  **UNIVERSAL LISTEN:** Constantly scan for ANY language.
-        2.  **TARGET LANGUAGE:** **${settings.targetLanguage}**.
+        1.  **SPEAKER ID:** You MUST attempt to identify speakers based on voice and context.
+        2.  **FORMAT:** Start EVERY output line with a speaker label in brackets.
+            Example: \`[Spanish Speaker 1]: The translation goes here.\`
+            Example: \`[German Male]: Text...\`
+            Example: \`[John]: Text...\` (If name is known).
+        3.  **TARGET LANGUAGE:** **${settings.targetLanguage}**.
         
-        **BEHAVIOR LOGIC:**
-        - **CASE A: You hear a FOREIGN language (NOT ${settings.targetLanguage}):**
-            - Translate it immediately to **${settings.targetLanguage}**.
-            - SPEAK the translation clearly.
-        
-        - **CASE B: You hear the TARGET language (${settings.targetLanguage}):**
-            - **DO NOT SPEAK.**
-            - **DO NOT TRANSLATE.**
-            - **PRODUCE NO AUDIO.**
-            - Allow the system to log the transcription quietly.
-        
-        **ADAPTIVE LEARNING:**
-        - Infer meaning from context, slang, and dialect.
+        **BEHAVIOR:**
+        - If you hear a foreign language, translate it to ${settings.targetLanguage} and provide the speaker tag.
+        - If you hear ${settings.targetLanguage}, transcribe it verbatim with the speaker tag.
       `;
 
       const assistantInstruction = `
         You are "ListeningProject".
-        Listen to the environment.
+        Identify distinct speakers in your output using the format \`[Speaker Name]: Text\`.
         Answer queries in **${settings.targetLanguage}**.
-        If the user speaks to you, respond helpfuly.
       `;
 
       const config = {
@@ -289,7 +308,7 @@ const App: React.FC = () => {
           voiceConfig: { prebuiltVoiceConfig: { voiceName: settings.voice } },
         },
         systemInstruction: activeMode === AppMode.LIVE_TRANSLATOR ? translatorInstruction : assistantInstruction,
-        inputAudioTranscription: {}, // Capture input text even if model is silent
+        inputAudioTranscription: {}, 
         outputAudioTranscription: {}, 
       };
 
@@ -323,14 +342,29 @@ const App: React.FC = () => {
             }
 
             if (serverContent?.turnComplete) {
-               if (currentInputTranscription.current.trim()) {
-                   addLog('user', currentInputTranscription.current.trim());
-                   currentInputTranscription.current = '';
-               }
+               // Process Model Output (This contains the speaker tags from instruction)
                if (currentOutputTranscription.current.trim()) {
-                   addLog('model', currentOutputTranscription.current.trim());
+                   const fullText = currentOutputTranscription.current.trim();
+                   
+                   // Regex to extract [Speaker ID]: Text
+                   const match = fullText.match(/^\[(.*?)]:?\s*(.*)/s);
+                   
+                   if (match) {
+                     const speakerId = match[1];
+                     const content = match[2];
+                     addLog('model', content, false, speakerId);
+                   } else {
+                     // Fallback if model didn't follow format exactly
+                     addLog('model', fullText);
+                   }
                    currentOutputTranscription.current = '';
                }
+               
+               // Optional: We can log the raw input as 'Microphone' or 'Raw Audio' if desired, 
+               // but usually the Model Output covers the "Translation" requirement.
+               // We will clear input buffer but not display it to avoid duplicate UI clutter 
+               // since the user wants "Listening" (Output focus).
+               currentInputTranscription.current = '';
             }
 
             const base64Audio = serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
@@ -389,7 +423,6 @@ const App: React.FC = () => {
       processorRef.current.disconnect();
       processorRef.current = null;
     }
-    // Stop all active streams
     activeStreamsRef.current.forEach(stream => {
       stream.getTracks().forEach(t => t.stop());
     });
@@ -404,13 +437,10 @@ const App: React.FC = () => {
       audioContextOutput.current = null;
     }
     
-    if (currentInputTranscription.current.trim()) {
-       addLog('user', currentInputTranscription.current.trim());
-       currentInputTranscription.current = '';
-    }
+    // Flush remaining buffers
     if (currentOutputTranscription.current.trim()) {
-       addLog('model', currentOutputTranscription.current.trim());
-       currentOutputTranscription.current = '';
+        addLog('model', currentOutputTranscription.current.trim());
+        currentOutputTranscription.current = '';
     }
 
     setIsRecording(false);
@@ -432,6 +462,7 @@ const App: React.FC = () => {
   };
 
   const startTraditionalTranscribe = async () => {
+    // ... (Existing implementation kept simple for brevity, doesn't support live speaker ID as well as Live API)
     addLog('system', 'Scanning for audio patterns (5s)...');
     await requestWakeLock();
     try {
@@ -451,11 +482,6 @@ const App: React.FC = () => {
                 addLog('user', 'Processing data packet...');
                 const text = await transcribeAudio(base64data, 'audio/webm');
                 addLog('model', text);
-                
-                if (text.toLowerCase().includes('explain') || text.toLowerCase().includes('what is')) {
-                    const ctx = await getContextualInfo(text);
-                    if (ctx.text) addLog('system', `Contextual Data: ${ctx.text}`);
-                }
             };
             stream.getTracks().forEach(t => t.stop());
             setIsRecording(false);
@@ -468,35 +494,10 @@ const App: React.FC = () => {
     } catch (e: any) {
         console.error("Transcription Error:", e);
         let msg = "Recording failed.";
-        if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
-            msg = "Microphone access denied. Please enable permissions.";
-        }
         addLog('system', msg, true);
         setIsRecording(false);
         releaseWakeLock();
     }
-  };
-
-  const handleTextSubmit = async (text: string) => {
-      addLog('user', text);
-      const arrayBuffer = await speakText(text, settings.voice);
-      if (arrayBuffer) {
-        try {
-            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-            const ctx = new AudioContextClass();
-            const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-            const source = ctx.createBufferSource();
-            source.buffer = audioBuffer;
-            source.connect(ctx.destination);
-            source.start(0);
-            addLog('model', 'Vocalizing...');
-        } catch (e) {
-            console.error("Audio playback error:", e);
-            addLog('system', 'Failed to play audio response.', true);
-        }
-      } else {
-        addLog('system', 'Failed to generate speech.', true);
-      }
   };
 
   return (
@@ -557,35 +558,64 @@ const App: React.FC = () => {
               </div>
               <p className="text-center max-w-xs text-sm">
                 <b>System Online.</b><br/>
-                Sensors are ready to fuse audio data.<br/>
-                AI is ready to adapt and evolve.
+                Sensors are ready.<br/>
+                Listening for speakers...
               </p>
             </div>
           ) : (
-            logs.map((msg) => (
-              <div 
-                key={msg.id} 
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div className={`max-w-[85%] rounded-2xl p-4 shadow-sm flex items-start gap-2 ${
-                  msg.isError 
-                    ? 'bg-red-900/20 border border-red-500/50 text-red-200' 
-                    : msg.role === 'user' 
-                      ? 'bg-blue-600 text-white rounded-br-none' 
-                      : msg.role === 'system'
-                        ? 'bg-slate-800/50 text-slate-400 text-sm border border-slate-700 font-mono'
-                        : 'bg-slate-800 text-slate-100 rounded-bl-none border border-slate-700'
-                }`}>
-                  {msg.isError && <AlertCircle size={16} className="mt-1 flex-shrink-0 text-red-400" />}
-                  <div>
-                    {msg.text}
-                    <div className="text-[10px] opacity-50 mt-1 text-right">
-                        {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            logs.map((msg) => {
+              if (msg.role === 'date-marker') {
+                return (
+                  <div key={msg.id} className="flex justify-center py-4">
+                     <span className="bg-slate-800/50 text-slate-400 text-xs px-3 py-1 rounded-full border border-slate-700/50 font-mono">
+                       {msg.text}
+                     </span>
+                  </div>
+                );
+              }
+
+              return (
+                <div 
+                  key={msg.id} 
+                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div className={`max-w-[85%] flex flex-col gap-1`}>
+                    {/* Metadata Header (Time + Speaker) */}
+                    <div className={`flex items-center gap-2 text-[10px] text-slate-400 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        {/* Speaker ID Button */}
+                        {(msg.speakerId || msg.role === 'model') && (
+                          <button 
+                            onClick={() => msg.speakerId && handleSpeakerClick(msg.speakerId)}
+                            className="flex items-center gap-1 hover:text-blue-400 transition-colors"
+                          >
+                            <User size={10} />
+                            <span className="font-semibold uppercase tracking-wider">
+                              {msg.speakerId ? (speakerRegistry[msg.speakerId] || msg.speakerId) : 'AI'}
+                            </span>
+                            {msg.speakerId && <Edit2 size={8} className="opacity-50" />}
+                          </button>
+                        )}
+                        <span className="opacity-50">•</span>
+                        <span>{msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                    </div>
+
+                    {/* Bubble */}
+                    <div className={`rounded-2xl p-4 shadow-sm ${
+                      msg.isError 
+                        ? 'bg-red-900/20 border border-red-500/50 text-red-200' 
+                        : msg.role === 'user' 
+                          ? 'bg-blue-600 text-white rounded-br-none' 
+                          : msg.role === 'system'
+                            ? 'bg-slate-800/50 text-slate-400 text-sm border border-slate-700 font-mono'
+                            : 'bg-slate-800 text-slate-100 rounded-bl-none border border-slate-700'
+                    }`}>
+                      {msg.isError && <AlertCircle size={16} className="mt-1 flex-shrink-0 text-red-400 mb-1" />}
+                      <div className="whitespace-pre-wrap">{msg.text}</div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
           <div ref={logsEndRef} />
         </div>
@@ -683,13 +713,44 @@ const App: React.FC = () => {
           <p className="text-center text-xs text-slate-500 mt-6 pb-2">
              {isRecording 
                ? activeMode === AppMode.LIVE_TRANSLATOR 
-                  ? `Scanning Environment -> ${settings.targetLanguage}`
+                  ? `Listening & Identifying -> ${settings.targetLanguage}`
                   : 'Recording...'
                : 'Tap microphone to start'
              }
           </p>
         </div>
       </main>
+
+      {/* Rename Speaker Modal */}
+      {editingSpeakerId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-sm shadow-xl">
+             <h3 className="text-white font-semibold mb-4">Rename Speaker</h3>
+             <input 
+                type="text" 
+                value={tempSpeakerName}
+                onChange={(e) => setTempSpeakerName(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+                placeholder="Enter new name..."
+                autoFocus
+             />
+             <div className="flex gap-3">
+               <button 
+                  onClick={() => setEditingSpeakerId(null)}
+                  className="flex-1 py-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors"
+               >
+                 Cancel
+               </button>
+               <button 
+                  onClick={saveSpeakerName}
+                  className="flex-1 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition-colors flex items-center justify-center gap-2"
+               >
+                 <Check size={16} /> Save
+               </button>
+             </div>
+          </div>
+        </div>
+      )}
 
       <SettingsModal 
         isOpen={showSettings} 
