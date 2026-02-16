@@ -14,7 +14,7 @@ const PocketModeOverlay: React.FC<PocketModeOverlayProps> = ({ isActive, onUnloc
   
   const pressStartTime = useRef<number | null>(null);
   const animationFrame = useRef<number | null>(null);
-  const fadeTimeout = useRef<NodeJS.Timeout | null>(null);
+  const fadeTimeout = useRef<number | null>(null);
 
   useEffect(() => {
     if (!isActive) {
@@ -33,7 +33,7 @@ const PocketModeOverlay: React.FC<PocketModeOverlayProps> = ({ isActive, onUnloc
     
     // Auto-hide after 3 seconds of no interaction to save battery/screen
     if (fadeTimeout.current) clearTimeout(fadeTimeout.current);
-    fadeTimeout.current = setTimeout(() => {
+    fadeTimeout.current = window.setTimeout(() => {
         if (!isPressing) setIsVisible(false);
     }, 3000);
   };

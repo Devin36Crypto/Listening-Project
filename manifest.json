@@ -2,7 +2,7 @@
   "name": "ListeningProject",
   "short_name": "ListeningProject",
   "description": "Real-time AI listening and translating assistant.",
-  "start_url": "/",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",
