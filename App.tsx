@@ -14,27 +14,6 @@ import { createPcmBlob, decodeBase64, decodeAudioData } from './utils/audio';
 import { MODEL_LIVE, INPUT_SAMPLE_RATE, OUTPUT_SAMPLE_RATE, LANGUAGES } from './constants';
 import { transcribeAudio, speakText, getContextualInfo } from './services/gemini';
 
-// --- Custom Insignia Component ---
-const LPIcon = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
-  <svg 
-    width={size} 
-    height={size} 
-    viewBox="0 0 100 100" 
-    fill="none" 
-    xmlns="http://www.w3.org/2000/svg"
-    className={className}
-  >
-    <rect width="100" height="100" rx="24" fill="url(#lp-gradient)" />
-    <text x="50" y="72" fontSize="55" fontWeight="900" fontFamily="sans-serif" fill="white" textAnchor="middle" style={{ letterSpacing: '-2px' }}>LP</text>
-    <defs>
-      <linearGradient id="lp-gradient" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#3b82f6"/>
-        <stop offset="1" stopColor="#9333ea"/>
-      </linearGradient>
-    </defs>
-  </svg>
-);
-
 const getAudioConstraints = (level: NoiseLevel) => {
   switch (level) {
     case 'off': return { echoCancellation: true, noiseSuppression: false, autoGainControl: false };
@@ -511,8 +490,8 @@ const App: React.FC = () => {
 
       {/* Header */}
       <header className="flex-none p-4 bg-slate-900/50 backdrop-blur-md border-b border-slate-800 flex justify-between items-center z-10 pt-[env(safe-area-inset-top,20px)]">
-        <div className="flex items-center gap-2">
-          <LPIcon size={36} className="shadow-lg" />
+        <div className="flex items-center gap-3">
+          <img src="./logo.svg" alt="LP Logo" className="w-10 h-10 shadow-lg rounded-xl" />
           <h1 className="font-bold text-lg tracking-tight text-white">ListeningProject</h1>
           {connectedMics > 1 && (
              <div className="ml-2 bg-green-900/50 p-1 px-2 rounded-full border border-green-500/30 flex items-center gap-1">
