@@ -3,7 +3,7 @@ import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { 
   Mic, MicOff, Settings as SettingsIcon, Globe, 
   Sparkles, Lock, Radio, FileText, FileX, AlertCircle,
-  Clock, Edit2, Check, User
+  Clock, Edit2, Check, User, WifiOff, Download
 } from 'lucide-react';
 
 import Visualizer from './components/Visualizer';
@@ -13,13 +13,44 @@ import { LogMessage, AppMode, Settings, NoiseLevel } from './types';
 import { createPcmBlob, decodeBase64, decodeAudioData } from './utils/audio';
 import { MODEL_LIVE, INPUT_SAMPLE_RATE, OUTPUT_SAMPLE_RATE, LANGUAGES } from './constants';
 import { transcribeAudio, speakText, getContextualInfo } from './services/gemini';
+import { useOfflineWorker } from './hooks/useOfflineWorker';
 
 const getAudioConstraints = (level: NoiseLevel) => {
+  const baseConstraints = {
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true,
+    // Advanced constraints (Chrome/Webkit specific)
+    googEchoCancellation: true,
+    googAutoGainControl: true,
+    googNoiseSuppression: true,
+    googHighpassFilter: true,
+    googBeamforming: true, // Request beamforming
+  };
+
   switch (level) {
-    case 'off': return { echoCancellation: true, noiseSuppression: false, autoGainControl: false };
-    case 'low': return { echoCancellation: true, noiseSuppression: false, autoGainControl: true };
-    case 'high': return { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
-    default: return { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+    case 'off': 
+      return { 
+        ...baseConstraints,
+        echoCancellation: false, 
+        noiseSuppression: false, 
+        autoGainControl: false,
+        googEchoCancellation: false,
+        googAutoGainControl: false,
+        googNoiseSuppression: false,
+        googHighpassFilter: false,
+        googBeamforming: false
+      };
+    case 'low': 
+      return { 
+        ...baseConstraints,
+        noiseSuppression: false, // Keep some background
+        googNoiseSuppression: false,
+      };
+    case 'high': 
+      return baseConstraints; // Max processing
+    default: 
+      return baseConstraints;
   }
 };
 
@@ -36,8 +67,13 @@ const App: React.FC = () => {
     voice: 'Puck',
     autoSpeak: true,
     noiseCancellationLevel: 'high',
+    pushToTalk: false,
   });
   const [connectedMics, setConnectedMics] = useState<number>(0);
+
+  // --- Offline Worker ---
+  const { status: offlineStatus, result: offlineResult, transcribe: offlineTranscribe } = useOfflineWorker();
+  const offlineChunksRef = useRef<Float32Array[]>([]);
 
   // --- Speaker Registry State ---
   // Maps "Spanish Speaker 1" (ID) -> "Maria" (User assigned name)
@@ -61,20 +97,85 @@ const App: React.FC = () => {
   
   // --- Refs for UI scrolling ---
   const logsEndRef = useRef<HTMLDivElement>(null);
+  
+  // --- Background Mode Refs ---
+  const backgroundAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // --- Cleanup on unmount ---
   useEffect(() => {
+    // Initialize silent audio element for background persistence
+    const audio = new Audio();
+    audio.loop = true;
+    // Tiny silent MP3 to keep the audio session active in background
+    audio.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTSVMAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////wAAAAAATGF2YzU4LjU0AAAAAAAAAAAAAAAAAAAAAAAAAAAACCAAAAAAAAAAAAAA//OEMAAAAAAAABAAAAAAAAAAABFhAAAAAAAAAAAAAA===';
+    backgroundAudioRef.current = audio;
+
     return () => {
       stopSession();
+      if (backgroundAudioRef.current) {
+        backgroundAudioRef.current.pause();
+        backgroundAudioRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // --- Background Mode Logic ---
+  const enableBackgroundMode = () => {
+    // 1. Play silent audio to trigger OS media session
+    if (backgroundAudioRef.current) {
+      backgroundAudioRef.current.play().catch(e => console.warn("Background audio start failed", e));
+    }
+
+    // 2. Set MediaSession metadata for Lock Screen controls
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: 'ListeningProject Active',
+        artist: activeMode === AppMode.OFFLINE_MODE ? 'Offline Mode' : 'Live Translator',
+        album: 'Background Listening',
+        artwork: [
+          { src: '/icon.svg', sizes: '96x96', type: 'image/svg+xml' },
+          { src: '/icon.svg', sizes: '128x128', type: 'image/svg+xml' },
+        ]
+      });
+      navigator.mediaSession.playbackState = 'playing';
+      
+      // Add handlers to keep session alive if user interacts with lock screen
+      navigator.mediaSession.setActionHandler('play', () => {}); 
+      navigator.mediaSession.setActionHandler('pause', () => {
+        // Optional: Allow stopping from lock screen? 
+        // For now, let's just keep it active or maybe stop recording?
+        // Let's keep it active to prevent accidental stops.
+      });
+      navigator.mediaSession.setActionHandler('stop', () => {
+        toggleRecording();
+      });
+    }
+  };
+
+  const disableBackgroundMode = () => {
+    if (backgroundAudioRef.current) {
+      backgroundAudioRef.current.pause();
+    }
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = 'none';
+    }
+  };
 
   useEffect(() => {
     if (showTranscript) {
       logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [logs, showTranscript]);
+
+  // --- Offline Result Handling ---
+  useEffect(() => {
+    if (offlineResult) {
+      if (offlineResult.task === 'transcribe') {
+        addLog('model', `[Offline]: ${offlineResult.output.text}`);
+      }
+    }
+  }, [offlineResult]);
 
   // --- Dynamic Audio Constraints Effect ---
   useEffect(() => {
@@ -120,8 +221,13 @@ const App: React.FC = () => {
   // Re-acquire wake lock if visibility changes while recording
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isRecording) {
-        requestWakeLock();
+      if (document.visibilityState === 'visible') {
+        if (isRecording) requestWakeLock();
+      } else {
+        // App went to background
+        if (isRecording) {
+           addLog('system', 'Background mode active. Listening continues...');
+        }
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -222,6 +328,9 @@ const App: React.FC = () => {
        }
     } else {
       addLog('system', `Audio Fusion Active: ${streamCount} sensors online.`);
+      if (settings.noiseCancellationLevel === 'high') {
+        addLog('system', `Beamforming & Noise Suppression: ENABLED`);
+      }
       addLog('system', `Triangulating 3D audio picture...`);
     }
 
@@ -245,6 +354,7 @@ const App: React.FC = () => {
       
       addLog('system', `Initializing Neural Interface...`);
       await requestWakeLock();
+      enableBackgroundMode();
       
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       
@@ -263,16 +373,20 @@ const App: React.FC = () => {
         You are "ListeningProject".
         
         **CORE PROTOCOLS:**
-        1.  **SPEAKER ID:** You MUST attempt to identify speakers based on voice and context.
-        2.  **FORMAT:** Start EVERY output line with a speaker label in brackets.
+        1.  **UNIVERSAL TRANSLATOR:** You are a real-time universal translator. Your goal is to make the user understand EVERYONE around them, regardless of what language they are speaking.
+        2.  **MULTI-LANGUAGE SCANNING:** Actively listen for ANY and ALL languages spoken in the audio stream. Do not limit yourself to one source language. If multiple people are speaking different languages (e.g., one in Spanish, one in French), translate ALL of them.
+        3.  **TARGET LANGUAGE:** Translate EVERYTHING into **${settings.targetLanguage}**.
+        4.  **SPEAKER ID:** You MUST attempt to identify and separate speakers based on voice and context.
+        5.  **FORMAT:** Start EVERY output line with a speaker label in brackets.
             Example: \`[Spanish Speaker 1]: The translation goes here.\`
-            Example: \`[German Male]: Text...\`
+            Example: \`[French Female]: The translation goes here.\`
             Example: \`[John]: Text...\` (If name is known).
-        3.  **TARGET LANGUAGE:** **${settings.targetLanguage}**.
         
         **BEHAVIOR:**
-        - If you hear a foreign language, translate it to ${settings.targetLanguage} and provide the speaker tag.
-        - If you hear ${settings.targetLanguage}, transcribe it verbatim with the speaker tag.
+        - If you hear a foreign language, translate it to ${settings.targetLanguage} immediately.
+        - If you hear ${settings.targetLanguage}, transcribe it verbatim.
+        - If multiple people speak at once or in quick succession, separate their translations clearly with new lines and speaker tags.
+        - Capture the nuance and tone of the original speaker in the translation.
       `;
 
       const assistantInstruction = `
@@ -393,6 +507,7 @@ const App: React.FC = () => {
       
       addLog('system', errorMessage, true);
       releaseWakeLock();
+      disableBackgroundMode();
       setIsRecording(false);
     }
   };
@@ -425,19 +540,92 @@ const App: React.FC = () => {
     setIsRecording(false);
     sessionPromiseRef.current = null;
     releaseWakeLock();
+    disableBackgroundMode();
     addLog('system', 'System halted.');
   };
 
   const toggleRecording = () => {
     if (isRecording) {
-      stopSession();
+      if (activeMode === AppMode.OFFLINE_MODE) {
+        stopOfflineRecording();
+      } else {
+        stopSession();
+      }
     } else {
       if (activeMode === AppMode.TRANSCRIBER) {
         startTraditionalTranscribe();
+      } else if (activeMode === AppMode.OFFLINE_MODE) {
+        startOfflineRecording();
       } else {
         startSession();
       }
     }
+  };
+
+  const startOfflineRecording = async () => {
+    if (isRecording) return;
+    try {
+      addLog('system', 'Initializing Offline Mode...');
+      await requestWakeLock();
+      enableBackgroundMode();
+      
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      // Whisper expects 16k sample rate
+      audioContextInput.current = new AudioContextClass({ sampleRate: 16000 });
+      await audioContextInput.current.resume();
+
+      const processor = await initializeMultiInputAudio(audioContextInput.current);
+      processorRef.current = processor;
+      
+      offlineChunksRef.current = [];
+
+      processor.onaudioprocess = (e) => {
+        const inputData = e.inputBuffer.getChannelData(0);
+        // Clone the data because the buffer is reused
+        offlineChunksRef.current.push(new Float32Array(inputData));
+      };
+
+      setIsRecording(true);
+      addLog('system', 'Offline Recording Started. Speak now.');
+    } catch (err) {
+      console.error(err);
+      addLog('system', 'Failed to start offline recording.', true);
+      setIsRecording(false);
+    }
+  };
+
+  const stopOfflineRecording = () => {
+    if (!processorRef.current) return;
+    
+    // Stop audio
+    processorRef.current.disconnect();
+    processorRef.current = null;
+    activeStreamsRef.current.forEach(s => s.getTracks().forEach(t => t.stop()));
+    activeStreamsRef.current = [];
+    if (audioContextInput.current) {
+      audioContextInput.current.close();
+      audioContextInput.current = null;
+    }
+
+    setIsRecording(false);
+    releaseWakeLock();
+    disableBackgroundMode();
+    addLog('system', 'Processing offline audio...');
+
+    // Merge chunks
+    const totalLength = offlineChunksRef.current.reduce((acc, chunk) => acc + chunk.length, 0);
+    const mergedAudio = new Float32Array(totalLength);
+    let offset = 0;
+    for (const chunk of offlineChunksRef.current) {
+      mergedAudio.set(chunk, offset);
+      offset += chunk.length;
+    }
+    
+    // Send to worker
+    // Simple mapping for Whisper (lowercase, first word)
+    // e.g. "Chinese (Mandarin)" -> "chinese"
+    const lang = settings.targetLanguage.toLowerCase().split(' ')[0].replace(/[()]/g, '');
+    offlineTranscribe(mergedAudio, lang); 
   };
 
   const startTraditionalTranscribe = async () => {
@@ -491,7 +679,7 @@ const App: React.FC = () => {
       {/* Header */}
       <header className="flex-none p-4 bg-slate-900/50 backdrop-blur-md border-b border-slate-800 flex justify-between items-center z-10 pt-[env(safe-area-inset-top,20px)]">
         <div className="flex items-center gap-3">
-          <img src="./logo.svg" alt="LP Logo" className="w-10 h-10 shadow-lg rounded-xl" />
+          <img src="./icon.svg" alt="LP Logo" className="w-10 h-10" />
           <h1 className="font-bold text-lg tracking-tight text-white">ListeningProject</h1>
           {connectedMics > 1 && (
              <div className="ml-2 bg-green-900/50 p-1 px-2 rounded-full border border-green-500/30 flex items-center gap-1">
@@ -502,6 +690,13 @@ const App: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setActiveMode(activeMode === AppMode.OFFLINE_MODE ? AppMode.LIVE_TRANSLATOR : AppMode.OFFLINE_MODE)}
+            className={`p-2 rounded-full transition-colors ${activeMode === AppMode.OFFLINE_MODE ? 'bg-orange-600 text-white shadow-lg shadow-orange-900/20' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
+            title="Offline Mode"
+          >
+            <WifiOff size={20} />
+          </button>
           <button
             onClick={() => setIsPocketMode(true)}
             className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white"
@@ -631,6 +826,22 @@ const App: React.FC = () => {
             </div>
           </div>
 
+          {/* Offline Progress Bar */}
+          {offlineStatus.status === 'loading' && (
+            <div className="mb-4 px-8">
+              <div className="flex justify-between text-xs text-slate-400 mb-1">
+                 <span>{offlineStatus.message}</span>
+                 <span>{Math.round(offlineStatus.progress || 0)}%</span>
+              </div>
+              <div className="w-full bg-slate-800 rounded-full h-1.5">
+                <div 
+                  className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" 
+                  style={{ width: `${offlineStatus.progress || 0}%` }}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Main Action Button Area */}
           <div className="flex items-center justify-center gap-6">
             
@@ -659,17 +870,65 @@ const App: React.FC = () => {
 
             {/* Mic Button (Center) */}
             <button
-              onClick={toggleRecording}
-              className={`relative w-20 h-20 rounded-full flex items-center justify-center shadow-lg shadow-blue-900/20 transition-all transform hover:scale-105 active:scale-95 ${
+              onPointerDown={(e) => {
+                if (settings.pushToTalk) {
+                  e.preventDefault(); // Prevent click
+                  if (!isRecording) {
+                    if (activeMode === AppMode.TRANSCRIBER) {
+                      startTraditionalTranscribe();
+                    } else if (activeMode === AppMode.OFFLINE_MODE) {
+                      startOfflineRecording();
+                    } else {
+                      startSession();
+                    }
+                  }
+                }
+              }}
+              onPointerUp={(e) => {
+                if (settings.pushToTalk) {
+                  e.preventDefault();
+                  if (isRecording) {
+                     if (activeMode === AppMode.OFFLINE_MODE) {
+                        stopOfflineRecording();
+                      } else {
+                        stopSession();
+                      }
+                  }
+                }
+              }}
+              onPointerLeave={(e) => {
+                 // Safety: if finger slides off button, stop recording
+                 if (settings.pushToTalk && isRecording) {
+                    if (activeMode === AppMode.OFFLINE_MODE) {
+                        stopOfflineRecording();
+                      } else {
+                        stopSession();
+                      }
+                 }
+              }}
+              onClick={() => {
+                if (!settings.pushToTalk) {
+                  toggleRecording();
+                }
+              }}
+              className={`relative w-20 h-20 rounded-full flex items-center justify-center shadow-lg shadow-blue-900/20 transition-all transform ${
+                 settings.pushToTalk ? 'active:scale-90' : 'hover:scale-105 active:scale-95'
+              } ${
                 isRecording 
-                  ? 'bg-red-500 hover:bg-red-600 animate-pulse' 
+                  ? activeMode === AppMode.OFFLINE_MODE 
+                    ? 'bg-orange-500 hover:bg-orange-600 animate-pulse'
+                    : 'bg-red-500 hover:bg-red-600 animate-pulse' 
                   : 'bg-white hover:bg-slate-100'
               }`}
             >
               {isRecording ? (
                 <MicOff size={32} className="text-white" />
               ) : (
-                <Mic size={32} className="text-slate-900" />
+                activeMode === AppMode.OFFLINE_MODE ? (
+                  <WifiOff size={32} className="text-slate-900" />
+                ) : (
+                  <Mic size={32} className="text-slate-900" />
+                )
               )}
             </button>
             
@@ -693,7 +952,9 @@ const App: React.FC = () => {
              {isRecording 
                ? activeMode === AppMode.LIVE_TRANSLATOR 
                   ? `Listening & Identifying -> ${settings.targetLanguage}`
-                  : 'Recording...'
+                  : activeMode === AppMode.OFFLINE_MODE
+                    ? 'Recording Offline...'
+                    : 'Recording...'
                : 'Tap microphone to start'
              }
           </p>

@@ -11,7 +11,8 @@ export interface LogMessage {
 export enum AppMode {
   LIVE_TRANSLATOR = 'LIVE_TRANSLATOR', // Live API (Simultaneous)
   TRANSCRIBER = 'TRANSCRIBER', // Gemini 3 Flash (STT)
-  CONTEXT_AWARE = 'CONTEXT_AWARE' // Gemini 3 Flash + Search
+  CONTEXT_AWARE = 'CONTEXT_AWARE', // Gemini 3 Flash + Search
+  OFFLINE_MODE = 'OFFLINE_MODE' // On-device ML
 }
 
 export interface AudioConfig {
@@ -27,4 +28,5 @@ export interface Settings {
   voice: VoiceName;
   autoSpeak: boolean;
   noiseCancellationLevel: NoiseLevel;
+  pushToTalk: boolean;
 }

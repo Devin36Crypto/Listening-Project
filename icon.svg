@@ -1,13 +1,21 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="1024" height="1024" rx="240" fill="url(#lp-gradient)" />
-  <path d="M512 250C530 250 545 265 545 283V550C545 568 530 583 512 583C494 583 479 568 479 550V283C479 265 494 250 512 250Z" fill="white" fill-opacity="0.9"/>
-  <path d="M350 400C350 390 358 382 368 382C378 382 386 390 386 400V500C386 510 378 518 368 518C358 518 350 510 350 500V400Z" fill="white" fill-opacity="0.7"/>
-  <path d="M638 400C638 390 646 382 656 382C666 382 674 390 674 400V500C674 510 666 518 656 518C646 518 638 510 638 500V400Z" fill="white" fill-opacity="0.7"/>
-  <text x="512" y="850" font-size="250" font-weight="900" font-family="sans-serif" fill="white" text-anchor="middle" style="letter-spacing: -10px;">LP</text>
   <defs>
-    <linearGradient id="lp-gradient" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+    <linearGradient id="grad" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
       <stop stop-color="#3b82f6"/>
       <stop offset="1" stop-color="#9333ea"/>
     </linearGradient>
   </defs>
+  
+  <rect width="1024" height="1024" rx="220" fill="url(#grad)"/>
+  
+  <!-- Sound Bars -->
+  <!-- Left -->
+  <rect x="390" y="170" width="60" height="120" rx="30" fill="white"/>
+  <!-- Center -->
+  <rect x="482" y="110" width="60" height="180" rx="30" fill="white"/>
+  <!-- Right -->
+  <rect x="574" y="170" width="60" height="120" rx="30" fill="white"/>
+
+  <!-- Text -->
+  <text x="512" y="780" font-family="sans-serif" font-weight="900" font-size="550" fill="white" text-anchor="middle" style="letter-spacing: -25px;">LP</text>
 </svg>

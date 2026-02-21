@@ -104,6 +104,24 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
               }`} />
             </button>
           </div>
+
+          {/* Push to Talk Toggle */}
+          <div className="flex items-center justify-between p-4 bg-slate-900 rounded-lg border border-slate-700/50">
+            <div className="flex flex-col">
+              <span className="text-slate-300 text-sm font-medium">Push to Talk Mode</span>
+              <span className="text-slate-500 text-xs">Hold microphone to listen, release to stop</span>
+            </div>
+            <button
+              onClick={() => onUpdate({ ...settings, pushToTalk: !settings.pushToTalk })}
+              className={`w-12 h-6 rounded-full relative transition-colors ${
+                settings.pushToTalk ? 'bg-blue-600' : 'bg-slate-600'
+              }`}
+            >
+              <span className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${
+                settings.pushToTalk ? 'translate-x-6' : ''
+              }`} />
+            </button>
+          </div>
         </div>
 
         <div className="p-6 border-t border-slate-700 bg-slate-800 sticky bottom-0">
