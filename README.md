@@ -1,20 +1,53 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# ListeningProject
 
-# Run and deploy your AI Studio app
+A real-time AI translator and transcriber built with React, Vite, and Google Gemini API.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/1de18a05-856b-4f96-a13a-582d5f4fab2a
+- **Live Translator**: Real-time translation using Gemini Live API.
+- **Transcriber**: Batch transcription for longer audio.
+- **AI Assistant**: Context-aware AI assistant.
+- **Offline Mode**: On-device transcription using Whisper (via Transformers.js).
+- **Pocket Mode**: Lock screen overlay for background listening.
+- **Background Listening**: Keeps audio session active when app is in background.
 
-## Run Locally
+## Setup
 
-**Prerequisites:**  Node.js
+1.  **Install Dependencies**:
+    ```bash
+    npm install
+    ```
 
+2.  **Environment Variables**:
+    Create a `.env` file with your Gemini API key:
+    ```env
+    VITE_GEMINI_API_KEY=your_api_key_here
+    ```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+3.  **Run Development Server**:
+    ```bash
+    npm run dev
+    ```
+
+4.  **Build for Production**:
+    ```bash
+    npm run build
+    ```
+
+## Deployment (Antigravity / Cloud Run)
+
+This project includes a `Dockerfile` for containerized deployment.
+
+1.  **Build Docker Image**:
+    ```bash
+    docker build -t listening-project .
+    ```
+
+2.  **Run Container**:
+    ```bash
+    docker run -p 3000:80 listening-project
+    ```
+
+## Offline Mode Note
+
+The offline mode uses `transformers.js` which downloads models to the browser cache. The first run requires an internet connection to fetch the models (~40MB for Whisper Tiny).
