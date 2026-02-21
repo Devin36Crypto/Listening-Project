@@ -1,16 +1,17 @@
 import React from 'react';
 import { Settings, VoiceName, NoiseLevel } from '../types';
 import { LANGUAGES, VOICES } from '../constants';
-import { X, Mic, Volume2, Globe } from 'lucide-react';
+import { X, Mic, Volume2, Globe, Download } from 'lucide-react';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   settings: Settings;
   onUpdate: (newSettings: Settings) => void;
+  onExport: () => void;
 }
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings, onUpdate }) => {
+const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings, onUpdate, onExport }) => {
   if (!isOpen) return null;
 
   return (
@@ -121,6 +122,21 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                 settings.pushToTalk ? 'translate-x-6' : ''
               }`} />
             </button>
+          </div>
+
+          {/* Data Management */}
+          <div className="pt-4 border-t border-slate-700">
+             <h3 className="text-sm font-semibold text-slate-400 mb-3 uppercase tracking-wider">Data Management</h3>
+             <button
+               onClick={onExport}
+               className="w-full flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 text-slate-200 py-3 rounded-lg transition-colors border border-slate-600"
+             >
+               <Download size={18} />
+               <span>Export Backup (JSON)</span>
+             </button>
+             <p className="text-xs text-slate-500 mt-2 text-center">
+               Saves your settings, speaker names, and current transcript history.
+             </p>
           </div>
         </div>
 
