@@ -1,51 +1,40 @@
-# Deployment Guide for Antigravity
+# Deployment Guide
 
-This project is container-ready and configured for deployment. Follow these steps to point Antigravity to your repository.
+ListeningProject is designed as a modern PWA (Progressive Web App).
 
-## 1. Export Source Code
-Since you are currently in a temporary AI Studio sandbox, you first need to get the code into a permanent Git repository.
+## Docker Deployment
 
-1.  **Download the Project**: Click the **Download** button in the AI Studio interface (usually in the top right or file menu) to save the source code to your computer.
-2.  **Unzip** the downloaded file.
+1. Build the image:
+   ```bash
+   docker build -t listening-project .
+   ```
 
-## 2. Create a Git Repository
-1.  Go to your Git provider (e.g., GitHub, GitLab, or Google Cloud Source Repositories).
-2.  Create a **new empty repository**.
-3.  Open a terminal in your unzipped project folder and run:
+2. Run the container:
+   ```bash
+   docker run -d -p 8080:80 --name lp listening-project
+   ```
 
-```bash
-git init
-git add .
-git commit -m "Initial commit - ListeningProject"
-git branch -M main
-git remote add origin <YOUR_REPOSITORY_URL>
-git push -u origin main
+## Production Considerations
+
+- **HTTPS**: Required for microphone access and service workers.
+- **API Security**: The API key is bundled in the build. For public deployment, use a backend proxy or restrictive API key settings in Google AI Studio.
+- **Environment Variables**: Ensure `VITE_GEMINI_API_KEY` is set during the build process.
+
+### Dockerfile
+
+```dockerfile
+# Build Stage
+FROM node:20-slim AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+# Production Stage
+FROM nginx:alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
 ```
-
-## 3. Configure Antigravity
-Now that your code is in a repository, you can point Antigravity to it.
-
-1.  Open **Antigravity** (or your deployment console).
-2.  Select **"New Service"** or **"Create Deployment"**.
-3.  Choose **"Deploy from Repository"** (or "Source").
-4.  **Select the Repository** you just created.
-5.  **Build Configuration**:
-    *   **Type**: Docker / Container
-    *   **Dockerfile Path**: `Dockerfile` (It is in the root directory)
-    *   **Port**: `80` (The Dockerfile exposes port 80 via Nginx)
-
-## 4. Environment Variables
-In the Antigravity configuration settings, add the following environment variable:
-
-*   `VITE_GEMINI_API_KEY`: Your Google Gemini API Key.
-
-## 5. Deploy
-Click **Deploy**. Antigravity will:
-1.  Clone your repository.
-2.  Build the Docker image using the provided `Dockerfile`.
-3.  Deploy the application.
-
-## Technical Details
-*   **Build System**: Vite (builds to static files in `/dist`)
-*   **Web Server**: Nginx (serves static files on port 80)
-*   **Base Image**: `node:18-alpine` (build) -> `nginx:alpine` (runtime)

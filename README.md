@@ -1,53 +1,37 @@
 # ListeningProject
 
-A real-time AI translator and transcriber built with React, Vite, and Google Gemini API.
+A real-time AI-powered translation and transcription application built with React, Vite, and the Google Gemini API.
 
 ## Features
 
-- **Live Translator**: Real-time translation using Gemini Live API.
-- **Transcriber**: Batch transcription for longer audio.
-- **AI Assistant**: Context-aware AI assistant.
-- **Offline Mode**: On-device transcription using Whisper (via Transformers.js).
-- **Pocket Mode**: Lock screen overlay for background listening.
-- **Background Listening**: Keeps audio session active when app is in background.
+- **Live Translator**: Real-time multi-language translation using Gemini Multimodal Live API.
+- **Transcriber**: High-fidelity transcription with speaker identification.
+- **AI Assistant**: Context-aware assistance with integrated search grounding.
+- **Offline Mode**: Local speech recognition and translation using Xenova Transformers.
+- **Pocket Mode**: Dimmed UI with lock protection for background listening.
+- **Session History**: Local storage of transcription sessions via IndexedDB.
 
-## Setup
+## Tech Stack
 
-1.  **Install Dependencies**:
-    ```bash
-    npm install
-    ```
+- **Framework**: React 18+ with TypeScript
+- **Styling**: Tailwind CSS
+- **Icons**: Lucide React
+- **AI**: 
+  - Google Gemini API (Multimodal Live, Flash, TTS)
+  - Xenova Transformers (Whisper, NLLB)
+- **Audio Handling**: Web Audio API (AudioWorklet, AnalyserNode)
+- **Persistence**: IndexedDB
 
-2.  **Environment Variables**:
-    Create a `.env` file with your Gemini API key:
-    ```env
-    VITE_GEMINI_API_KEY=your_api_key_here
-    ```
+## Getting Started
 
-3.  **Run Development Server**:
-    ```bash
-    npm run dev
-    ```
+1. Clone the repository.
+2. Install dependencies: `npm install`
+3. Create a `.env` file with your Gemini API key:
+   ```
+   VITE_GEMINI_API_KEY=your_api_key
+   ```
+4. Start the development server: `npm run dev`
 
-4.  **Build for Production**:
-    ```bash
-    npm run build
-    ```
+## Deployment
 
-## Deployment (Antigravity / Cloud Run)
-
-This project includes a `Dockerfile` for containerized deployment.
-
-1.  **Build Docker Image**:
-    ```bash
-    docker build -t listening-project .
-    ```
-
-2.  **Run Container**:
-    ```bash
-    docker run -p 3000:80 listening-project
-    ```
-
-## Offline Mode Note
-
-The offline mode uses `transformers.js` which downloads models to the browser cache. The first run requires an internet connection to fetch the models (~40MB for Whisper Tiny).
+Refer to [DEPLOYMENT.md](./DEPLOYMENT.md) for details on containerization and cloud deployment.

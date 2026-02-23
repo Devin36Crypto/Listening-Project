@@ -4,6 +4,7 @@ export const MODEL_TRANSCRIBE = 'gemini-3-flash-preview';
 export const MODEL_FAST = 'gemini-flash-lite-latest'; // Mapped from 2.5-flash-lite requirement
 export const MODEL_TTS = 'gemini-2.5-flash-preview-tts';
 export const MODEL_SEARCH = 'gemini-3-flash-preview'; // For grounding
+export const MODEL_FLASH = 'gemini-3-flash-preview';
 
 // Audio defaults
 export const INPUT_SAMPLE_RATE = 16000;

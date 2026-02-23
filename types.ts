@@ -19,6 +19,15 @@ export interface AudioConfig {
   sampleRate: number;
 }
 
+declare global {
+  interface Window {
+    aistudio?: {
+      hasSelectedApiKey: () => Promise<boolean>;
+      openSelectKey: () => Promise<void>;
+    };
+  }
+}
+
 export type VoiceName = 'Puck' | 'Charon' | 'Kore' | 'Fenrir' | 'Zephyr';
 
 export type NoiseLevel = 'off' | 'low' | 'high';
@@ -29,4 +38,14 @@ export interface Settings {
   autoSpeak: boolean;
   noiseCancellationLevel: NoiseLevel;
   pushToTalk: boolean;
+}
+
+export interface Session {
+  id: string;
+  startTime: Date;
+  endTime?: Date;
+  mode: AppMode;
+  targetLanguage: string;
+  logs: LogMessage[];
+  speakerRegistry: Record<string, string>;
 }

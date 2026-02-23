@@ -1,48 +1,18 @@
-
 import { pipeline, env } from '@xenova/transformers';
 
-// Skip local model checks
+// Skip local check to download from Hub
 env.allowLocalModels = false;
 env.useBrowserCache = true;
 
 class OfflineProcessor {
-  static instance: any = null;
-  static transcriber: any = null;
-  static translator: any = null;
+  static task_instances: Record<string, any> = {};
 
-  static async getInstance(task: string, model: string) {
-    if (task === 'automatic-speech-recognition') {
-      if (!this.transcriber) {
-        console.log(`Loading transcriber: ${model}`);
-        this.transcriber = await pipeline(task, model, {
-          progress_callback: (data: any) => {
-            self.postMessage({
-              status: 'loading',
-              task: 'transcribe',
-              file: data.file,
-              progress: data.progress,
-            });
-          },
-        });
-      }
-      return this.transcriber;
-    } else if (task === 'translation') {
-      if (!this.translator) {
-        console.log(`Loading translator: ${model}`);
-        this.translator = await pipeline(task, model, {
-          progress_callback: (data: any) => {
-            self.postMessage({
-              status: 'loading',
-              task: 'translate',
-              file: data.file,
-              progress: data.progress,
-            });
-          },
-        });
-      }
-      return this.translator;
+  static async getInstance(task: string, model: string, progress_callback?: (data: any) => void) {
+    const key = `${task}-${model}`;
+    if (!this.task_instances[key]) {
+      this.task_instances[key] = pipeline(task as any, model, { progress_callback });
     }
-    return null;
+    return this.task_instances[key];
   }
 }
 
@@ -51,46 +21,49 @@ self.addEventListener('message', async (event) => {
 
   try {
     if (type === 'transcribe') {
+      const { audio, language } = data;
+
+      const progress_callback = (progress: any) => {
+        self.postMessage({ status: 'loading', task: 'transcribe', progress: progress.progress, file: progress.file });
+      };
+
       const transcriber = await OfflineProcessor.getInstance(
         'automatic-speech-recognition',
-        'Xenova/whisper-tiny'
+        'Xenova/whisper-tiny',
+        progress_callback
       );
 
-      const output = await transcriber(data.audio, {
+      const output = await transcriber(audio, {
         chunk_length_s: 30,
         stride_length_s: 5,
-        language: data.language, // e.g., 'english', 'spanish'
+        language: language || 'english',
         task: 'transcribe',
+        return_timestamps: true,
       });
 
-      self.postMessage({
-        status: 'complete',
-        task: 'transcribe',
-        output,
-      });
+      self.postMessage({ status: 'complete', task: 'transcribe', output });
+
     } else if (type === 'translate') {
-      // Use a smaller model for demo purposes or NLLB for full support
-      // For now, let's use NLLB-200-distilled-600M (quantized)
+      const { text, source_lang, target_lang } = data;
+
+      const progress_callback = (progress: any) => {
+        self.postMessage({ status: 'loading', task: 'translate', progress: progress.progress, file: progress.file });
+      };
+
       const translator = await OfflineProcessor.getInstance(
         'translation',
-        'Xenova/nllb-200-distilled-600M'
+        'Xenova/nLLB-200-distilled-600M',
+        progress_callback
       );
 
-      const output = await translator(data.text, {
-        src_lang: data.source_lang, // e.g., 'eng_Latn'
-        tgt_lang: data.target_lang, // e.g., 'spa_Latn'
+      const output = await translator(text, {
+        src_lang: source_lang,
+        tgt_lang: target_lang,
       });
 
-      self.postMessage({
-        status: 'complete',
-        task: 'translate',
-        output,
-      });
+      self.postMessage({ status: 'complete', task: 'translate', output });
     }
   } catch (error: any) {
-    self.postMessage({
-      status: 'error',
-      error: error.message,
-    });
+    self.postMessage({ status: 'error', error: error.message });
   }
 });
