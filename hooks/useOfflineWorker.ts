@@ -1,64 +1,61 @@
+import { useState, useCallback, useEffect, useRef } from 'react';
 
-import { useRef, useState, useEffect, useCallback } from 'react';
-
-interface WorkerStatus {
-  status: 'idle' | 'loading' | 'ready' | 'processing' | 'error';
-  progress?: number;
-  message?: string;
-}
+type WorkerStatus = {
+    status: 'idle' | 'loading' | 'ready' | 'error';
+    progress?: number;
+    message?: string;
+};
 
 export function useOfflineWorker() {
-  const workerRef = useRef<Worker | null>(null);
-  const [status, setStatus] = useState<WorkerStatus>({ status: 'idle' });
-  const [result, setResult] = useState<any>(null);
+    const [status, setStatus] = useState<WorkerStatus>({ status: 'idle' });
+    const [result, setResult] = useState<any>(null);
+    const workerRef = useRef<Worker | null>(null);
 
-  useEffect(() => {
-    // Initialize worker
-    workerRef.current = new Worker(new URL('../workers/offline.worker.ts', import.meta.url), {
-      type: 'module',
-    });
-
-    workerRef.current.onmessage = (event) => {
-      const { status: workerStatus, task, output, progress, error, file } = event.data;
-
-      if (workerStatus === 'loading') {
-        setStatus({
-          status: 'loading',
-          progress: progress,
-          message: `Loading ${task} model... ${file || ''} (${Math.round(progress || 0)}%)`,
+    useEffect(() => {
+        // Initialize worker from public URL or Vite-managed asset
+        const worker = new Worker(new URL('../workers/offline.worker.ts', import.meta.url), {
+            type: 'module'
         });
-      } else if (workerStatus === 'complete') {
-        setStatus({ status: 'ready' });
-        setResult({ task, output });
-      } else if (workerStatus === 'error') {
-        setStatus({ status: 'error', message: error });
-      }
-    };
 
-    return () => {
-      workerRef.current?.terminate();
-    };
-  }, []);
+        worker.onmessage = (e) => {
+            const { type, status: s, progress, message, result: r } = e.data;
+            
+            if (type === 'status') {
+                setStatus({ status: s, progress, message });
+            } else if (type === 'result') {
+                setResult(r);
+            }
+        };
 
-  const transcribe = useCallback((audio: Float32Array, language: string) => {
-    if (workerRef.current) {
-      setStatus({ status: 'processing', message: 'Transcribing...' });
-      workerRef.current.postMessage({
-        type: 'transcribe',
-        data: { audio, language },
-      });
-    }
-  }, []);
+        workerRef.current = worker;
 
-  const translate = useCallback((text: string, source_lang: string, target_lang: string) => {
-    if (workerRef.current) {
-      setStatus({ status: 'processing', message: 'Translating...' });
-      workerRef.current.postMessage({
-        type: 'translate',
-        data: { text, source_lang, target_lang },
-      });
-    }
-  }, []);
+        return () => worker.terminate();
+    }, []);
 
-  return { status, result, transcribe, translate };
+    const transcribe = useCallback((audio: Float32Array, language: string) => {
+        if (workerRef.current) {
+            workerRef.current.postMessage({
+                task: 'transcribe',
+                audio,
+                language
+            });
+        }
+    }, []);
+
+    const translate = useCallback((text: string, source: string, target: string) => {
+        if (workerRef.current) {
+            workerRef.current.postMessage({
+                task: 'translate',
+                text,
+                source,
+                target
+            });
+        }
+    }, []);
+
+    const ping = useCallback(() => {
+        if (workerRef.current) workerRef.current.postMessage({ task: 'ping' });
+    }, []);
+
+    return { status, result, transcribe, translate, ping };
 }

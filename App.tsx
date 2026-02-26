@@ -6,7 +6,7 @@ import {
   Square,
   VolumeX,
   Smartphone,
-  Lock,
+  Lock as LucideLock,
   Clock,
   Search,
   Globe,
@@ -16,22 +16,23 @@ import {
   Check,
   Key,
   User,
-  Users
+  Users,
+  Shield
 } from 'lucide-react';
-
 import Visualizer from './components/Visualizer';
 import SettingsModal from './components/SettingsModal';
 import PocketModeOverlay from './components/PocketModeOverlay';
 import OfflineWarningModal from './components/OfflineWarningModal';
 import HistoryModal from './components/HistoryModal';
 import SpeakerManagerModal from './components/SpeakerManagerModal';
+import VaultKeyModal from './components/VaultKeyModal';
+import CustomSelect from './components/CustomSelect';
 import { LogMessage, AppMode, Settings } from './types';
 import { LANGUAGES } from './constants';
 import { useOfflineWorker } from './hooks/useOfflineWorker';
 import { useAudioSession } from './hooks/useAudioSession';
 import { saveSession, importSessions, clearAllSessions, getStorageUsage } from './services/db';
 import { getSpeakerColor, getSpeakerInitials } from './utils/colors';
-
 const App: React.FC = () => {
   // --- UI State ---
   const [activeMode, setActiveMode] = useState<AppMode>(AppMode.LIVE_TRANSLATOR);
@@ -43,7 +44,7 @@ const App: React.FC = () => {
   const [showHistory, setShowHistory] = useState<boolean>(false);
   const [showSpeakerManager, setShowSpeakerManager] = useState<boolean>(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [hasApiKey, setHasApiKey] = useState<boolean>(false);
+  const [apiKey, setApiKey] = useState<string | null>(null);
   const [manualKey, setManualKey] = useState<string>('');
   const [settings, setSettings] = useState<Settings>({
     targetLanguage: 'English',
@@ -53,64 +54,55 @@ const App: React.FC = () => {
     pushToTalk: false,
   });
   const [storageUsage, setStorageUsage] = useState<number>(0);
-
+  const [vaultKey, setVaultKey] = useState<string | null>(null);
+  const [showVaultModal, setShowVaultModal] = useState<boolean>(false);
   // --- Update storage usage when settings open ---
   useEffect(() => {
     if (showSettings) {
-      getStorageUsage().then(setStorageUsage);
+      getStorageUsage(vaultKey).then(setStorageUsage);
     }
-  }, [showSettings]);
-
+  }, [showSettings, vaultKey]);
   const handleImportData = async (file: File) => {
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      
       if (data.sessions && Array.isArray(data.sessions)) {
-        await importSessions(data.sessions);
+        await importSessions(data.sessions, vaultKey);
         alert('History imported successfully!');
       }
-      
       if (data.settings) setSettings(data.settings);
       if (data.speakerRegistry) setSpeakerRegistry(data.speakerRegistry);
-      
       getStorageUsage().then(setStorageUsage);
     } catch (error) {
       console.error('Import failed:', error);
       alert('Failed to import data. Invalid file format.');
     }
   };
-
   const handleClearData = async () => {
     if (window.confirm('Are you sure you want to delete ALL local history? This cannot be undone.')) {
       await clearAllSessions();
       setLogs([]); // Clear current view too
-      getStorageUsage().then(setStorageUsage);
+      getStorageUsage(vaultKey).then(setStorageUsage);
       alert('All local data cleared.');
     }
   };
-
   // --- Speaker Management State ---
   const [speakerRegistry, setSpeakerRegistry] = useState<Record<string, string>>({});
   const [editingSpeakerId, setEditingSpeakerId] = useState<string | null>(null);
   const [tempSpeakerName, setTempSpeakerName] = useState<string>('');
-
   const handleSpeakerClick = useCallback((id: string) => {
     setTempSpeakerName(speakerRegistry[id] || id);
     setEditingSpeakerId(id);
   }, [speakerRegistry]);
-
   const saveSpeakerName = useCallback(() => {
     if (editingSpeakerId && tempSpeakerName.trim()) {
       setSpeakerRegistry((prev: Record<string, string>) => ({ ...prev, [editingSpeakerId]: tempSpeakerName.trim() }));
       setEditingSpeakerId(null);
     }
   }, [editingSpeakerId, tempSpeakerName]);
-
   const renameSpeaker = useCallback((id: string, newName: string) => {
     setSpeakerRegistry(prev => ({ ...prev, [id]: newName }));
   }, []);
-
   const deleteSpeaker = useCallback((id: string) => {
     setSpeakerRegistry(prev => {
       const next = { ...prev };
@@ -118,12 +110,9 @@ const App: React.FC = () => {
       return next;
     });
   }, []);
-
   // --- Offline Worker ---
   const { status: offlineStatus, result: offlineResult, transcribe: offlineTranscribe } = useOfflineWorker();
-
   const logsEndRef = useRef<HTMLDivElement>(null);
-
   // --- Helper: Add Log ---
   const addLog = useCallback(
     (
@@ -139,56 +128,54 @@ const App: React.FC = () => {
     },
     []
   );
-
-  // --- Check for API Key ---
-  useEffect(() => {
-    const checkApiKey = async () => {
-      let envKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (!envKey && typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-        envKey = process.env.API_KEY;
-      }
-
-      if (envKey) {
-        setHasApiKey(true);
+  // --- Consolidated API Key Initialization & Privacy Vault Logic ---
+  const initializeApiKey = useCallback(async () => {
+    // 1. Check environment variables
+    let key = import.meta.env.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : null);
+    // 2. Check LocalStorage
+    if (!key) {
+      key = localStorage.getItem('gemini_api_key');
+    }
+    // 3. Check AI Studio (if available)
+    if (!key && window.aistudio?.hasSelectedApiKey) {
+      const hasStudioKey = await window.aistudio.hasSelectedApiKey();
+      if (hasStudioKey) {
+        setApiKey('STUDIO_MANAGED');
         return;
       }
-
-      const localKey = localStorage.getItem('gemini_api_key');
-      if (localKey) {
-        setHasApiKey(true);
-        return;
+    }
+    if (key) {
+      setApiKey(key);
+    } else {
+      // No key found anywhere: Prompt or show Vault
+      if (window.aistudio?.openSelectKey) {
+        handleConnectApiKey();
+      } else {
+        setShowVaultModal(true);
       }
-
-      if (window.aistudio && window.aistudio.hasSelectedApiKey) {
-        const hasKey = await window.aistudio.hasSelectedApiKey();
-        if (hasKey) {
-          setHasApiKey(true);
-        }
-      }
-    };
-    checkApiKey();
+    }
   }, []);
-
+  useEffect(() => {
+    initializeApiKey();
+  }, [initializeApiKey]);
   const handleConnectApiKey = async () => {
     if (window.aistudio && window.aistudio.openSelectKey) {
       await window.aistudio.openSelectKey();
       // Assume success after dialog closes (race condition mitigation)
-      setHasApiKey(true);
+      setApiKey('STUDIO_MANAGED');
     } else {
       alert("API Key selection is not available in this environment. Please set VITE_GEMINI_API_KEY in .env");
     }
   };
-
   const handleSaveManualKey = () => {
     if (manualKey.trim().length > 10) {
       localStorage.setItem('gemini_api_key', manualKey.trim());
-      setHasApiKey(true);
+      setApiKey(manualKey.trim());
       window.location.reload();
     } else {
       alert("Please enter a valid API Key.");
     }
   };
-
   // --- Handle offline chunks from audio session ---
   const handleOfflineChunks = useCallback((chunks: Float32Array[]) => {
     if (chunks.length === 0) return;
@@ -199,7 +186,6 @@ const App: React.FC = () => {
     const lang = settings.targetLanguage.toLowerCase().split(' ')[0].replace(/[()]/g, '');
     offlineTranscribe(merged, lang);
   }, [offlineTranscribe, settings.targetLanguage]);
-
   // --- Audio Session Hook ---
   const {
     isRecording,
@@ -209,20 +195,17 @@ const App: React.FC = () => {
     stopSession,
     startOfflineRecording,
     stopOfflineRecording,
-  } = useAudioSession(settings, activeMode, addLog, handleOfflineChunks);
-
+  } = useAudioSession(settings, activeMode, addLog, handleOfflineChunks, apiKey);
   // --- Auto-scroll logs ---
   useEffect(() => {
     if (showTranscript) logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs, showTranscript]);
-
   // --- Offline Result Handling ---
   useEffect(() => {
     if (offlineResult?.task === 'transcribe') {
       addLog('model', `[Offline]: ${offlineResult.output.text}`);
     }
   }, [offlineResult, addLog]);
-
   const toggleRecording = useCallback(() => {
     if (isRecording) {
       activeMode === AppMode.OFFLINE_MODE ? stopOfflineRecording() : stopSession();
@@ -231,12 +214,10 @@ const App: React.FC = () => {
       const newSessionId = Date.now().toString();
       setCurrentSessionId(newSessionId);
       setLogs([]); // Reset logs for new session
-
       if (activeMode === AppMode.OFFLINE_MODE) startOfflineRecording();
       else startSession();
     }
   }, [isRecording, activeMode, stopOfflineRecording, stopSession, startOfflineRecording, startSession]);
-
   const handleOfflineModeToggle = useCallback(() => {
     if (activeMode === AppMode.OFFLINE_MODE) {
       setActiveMode(AppMode.LIVE_TRANSLATOR);
@@ -246,14 +227,13 @@ const App: React.FC = () => {
       else setShowOfflineWarning(true);
     }
   }, [activeMode]);
-
   const handleLanguageChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
     setSettings((prev: Settings) => ({ ...prev, targetLanguage: event.target.value }));
   }, []);
-
-  // --- Auto-Save to IndexedDB ---
+  // --- Auto-Save to IndexedDB (Debounced) ---
   useEffect(() => {
-    if (currentSessionId && logs.length > 0) {
+    if (!currentSessionId || logs.length === 0) return;
+    const saveTimer = setTimeout(() => {
       const session = {
         id: currentSessionId,
         startTime: new Date(parseInt(currentSessionId)),
@@ -263,11 +243,16 @@ const App: React.FC = () => {
         logs: logs,
         speakerRegistry: speakerRegistry
       };
-      saveSession(session).catch(err => console.error("Failed to auto-save session", err));
-    }
-  }, [logs, currentSessionId, activeMode, settings.targetLanguage, speakerRegistry]);
-
-  if (!hasApiKey) {
+      // Explicitly capture values for async save to avoid closure issues
+      const finalVaultKey = vaultKey;
+      saveSession(session, finalVaultKey).catch(err => {
+        console.error("Failed to auto-save session:", err);
+        addLog('system', 'Auto-save failed. Your progress may not be persistent.', true);
+      });
+    }, 2000); // 2s Debounce
+    return () => clearTimeout(saveTimer);
+  }, [logs, currentSessionId, activeMode, settings.targetLanguage, speakerRegistry, vaultKey, addLog]);
+  if (!apiKey) {
     return (
       <div className="flex flex-col h-screen bg-[#0f172a] text-slate-200 items-center justify-center p-6 text-center">
         <div className="w-20 h-20 bg-blue-600/20 rounded-full flex items-center justify-center mb-6 border border-blue-500/30">
@@ -284,7 +269,6 @@ const App: React.FC = () => {
           <Key size={18} />
           Connect Google AI Studio
         </button>
-
         <div className="w-full max-w-sm border-t border-slate-800 pt-8">
           <p className="text-sm text-slate-400 mb-4">Or enter your API key manually:</p>
           <div className="flex gap-2">
@@ -303,7 +287,6 @@ const App: React.FC = () => {
             </button>
           </div>
         </div>
-
         <p className="mt-8 text-xs text-slate-500">
           <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-300">
             Learn more about billing and API keys
@@ -312,16 +295,13 @@ const App: React.FC = () => {
       </div>
     );
   }
-
   return (
     <div className="flex flex-col h-screen bg-[#0f172a] text-slate-200 safe-area-inset">
-
       <PocketModeOverlay
         isActive={isPocketMode}
         onUnlock={() => setIsPocketMode(false)}
         statusText={isRecording ? `ListeningProject Live: ${connectedMics} Sensors Active` : 'ListeningProject Standby'}
       />
-
       {/* Header */}
       <header className="flex-none p-4 bg-slate-900/50 backdrop-blur-md border-b border-slate-800 flex justify-between items-center z-10 pt-[env(safe-area-inset-top,20px)]">
         <div className="flex items-center gap-3">
@@ -334,7 +314,6 @@ const App: React.FC = () => {
             </div>
           )}
         </div>
-
         <div className="flex items-center gap-2">
           <button
             onClick={handleOfflineModeToggle}
@@ -348,7 +327,7 @@ const App: React.FC = () => {
             className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white"
             title="Enter Pocket Mode"
           >
-            <Lock size={20} />
+            <LucideLock size={20} />
           </button>
           <button
             onClick={() => setShowSpeakerManager(true)}
@@ -365,6 +344,13 @@ const App: React.FC = () => {
             <Clock size={20} />
           </button>
           <button
+            onClick={() => setShowVaultModal(true)}
+            className={`p-2 rounded-full transition-all border ${vaultKey ? 'bg-purple-900/40 border-purple-500/50 text-purple-300 shadow-lg shadow-purple-900/20' : 'hover:bg-slate-800 border-transparent text-slate-400 hover:text-white'}`}
+            title="Privacy Vault"
+          >
+            <Shield size={20} />
+          </button>
+          <button
             onClick={() => setShowSettings(true)}
             className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white"
           >
@@ -372,10 +358,8 @@ const App: React.FC = () => {
           </button>
         </div>
       </header>
-
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col relative overflow-hidden">
-
         {/* Logs */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-32">
           {!showTranscript ? (
@@ -415,9 +399,8 @@ const App: React.FC = () => {
                           className="flex items-center gap-2 hover:bg-slate-800/50 rounded-full pr-2 py-0.5 transition-colors group"
                           disabled={!msg.speakerId}
                         >
-                          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white shadow-sm ${
-                            msg.speakerId ? getSpeakerColor(msg.speakerId) : 'bg-blue-600'
-                          }`}>
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white shadow-sm ${msg.speakerId ? getSpeakerColor(msg.speakerId) : 'bg-blue-600'
+                            }`}>
                             {msg.speakerId ? getSpeakerInitials(speakerRegistry[msg.speakerId] || msg.speakerId) : 'AI'}
                           </div>
                           <span className="font-semibold text-slate-300 group-hover:text-blue-400 transition-colors">
@@ -446,10 +429,8 @@ const App: React.FC = () => {
           )}
           <div ref={logsEndRef} />
         </div>
-
         {/* Bottom Controls */}
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#0f172a] via-[#0f172a] to-transparent pt-12 pb-[max(1.5rem,env(safe-area-inset-bottom))] px-4">
-
           {/* Visualizer */}
           <div className="mb-6">
             <Visualizer
@@ -461,7 +442,6 @@ const App: React.FC = () => {
               }
             />
           </div>
-
           {/* Mode Selector */}
           <div className="flex justify-center mb-6">
             <div className="flex bg-slate-800/80 rounded-full p-1 border border-slate-700">
@@ -485,7 +465,6 @@ const App: React.FC = () => {
               </button>
             </div>
           </div>
-
           {/* Offline Progress Bar */}
           {offlineStatus.status === 'loading' && (
             <div className="mb-4 px-8">
@@ -501,33 +480,25 @@ const App: React.FC = () => {
               </div>
             </div>
           )}
-
           {/* Action Buttons */}
           <div className="flex items-center justify-center gap-6">
-
             {/* Language Selector */}
             {!isRecording && (
-              <div className="relative flex flex-col items-center">
-                <div className="relative w-12 h-12">
-                  <select
-                    value={settings.targetLanguage}
-                    onChange={handleLanguageChange}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                  >
-                    {LANGUAGES.map(lang => (
-                      <option key={lang.code} value={lang.code}>{lang.label}</option>
-                    ))}
-                  </select>
-                  <div className="w-full h-full bg-slate-800 rounded-full flex items-center justify-center border border-slate-700 shadow-sm pointer-events-none hover:bg-slate-700 transition-colors">
-                    <Globe size={20} className="text-blue-400" />
-                  </div>
-                </div>
+              <div className="flex flex-col items-center">
+                <CustomSelect
+                  value={settings.targetLanguage}
+                  onChange={(val) => setSettings(prev => ({ ...prev, targetLanguage: val }))}
+                  options={LANGUAGES.map(l => ({ value: l.code, label: l.label }))}
+                  position="up"
+                  className="w-12 h-12"
+                  placeholder=""
+                  icon={<Globe size={20} className="text-blue-400" />}
+                />
                 <span className="text-[10px] text-slate-400 mt-1 max-w-[60px] truncate text-center">
                   Output: {settings.targetLanguage}
                 </span>
               </div>
             )}
-
             {/* Mic Button */}
             <button
               onPointerDown={e => {
@@ -562,7 +533,6 @@ const App: React.FC = () => {
                   : <Mic size={32} className="text-slate-900" />
               )}
             </button>
-
             {/* Transcript Toggle */}
             <div className="relative flex flex-col items-center">
               <button
@@ -577,7 +547,6 @@ const App: React.FC = () => {
               <span className="text-[10px] text-slate-400 mt-1 text-center">Transcript</span>
             </div>
           </div>
-
           <p className="text-center text-xs text-slate-500 mt-6 pb-2">
             {isRecording
               ? activeMode === AppMode.LIVE_TRANSLATOR
@@ -590,7 +559,6 @@ const App: React.FC = () => {
           </p>
         </div>
       </main>
-
       {/* Rename Speaker Modal */}
       {editingSpeakerId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -621,7 +589,6 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
-
       <SpeakerManagerModal
         isOpen={showSpeakerManager}
         onClose={() => setShowSpeakerManager(false)}
@@ -630,7 +597,6 @@ const App: React.FC = () => {
         onDeleteSpeaker={deleteSpeaker}
         activeSpeakers={Array.from(new Set(logs.map(l => l.speakerId).filter(Boolean) as string[]))}
       />
-
       <SettingsModal
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
@@ -659,7 +625,6 @@ const App: React.FC = () => {
         onClearData={handleClearData}
         storageUsage={storageUsage}
       />
-
       <OfflineWarningModal
         isOpen={showOfflineWarning}
         onConfirm={() => {
@@ -669,11 +634,16 @@ const App: React.FC = () => {
         }}
         onCancel={() => setShowOfflineWarning(false)}
       />
-
       <HistoryModal
         isOpen={showHistory}
         onClose={() => setShowHistory(false)}
+        vaultKey={vaultKey}
         onSelectSession={(session) => {
+          if (session.mode === AppMode.LOCKED) {
+            setShowHistory(false);
+            setShowVaultModal(true);
+            return;
+          }
           setLogs(session.logs);
           setSpeakerRegistry(session.speakerRegistry);
           setActiveMode(session.mode);
@@ -683,8 +653,13 @@ const App: React.FC = () => {
           addLog('system', `Loaded session from ${session.startTime.toLocaleString()}`);
         }}
       />
+      <VaultKeyModal
+        isOpen={showVaultModal}
+        onClose={() => setShowVaultModal(false)}
+        currentKey={vaultKey}
+        onSaveKey={setVaultKey}
+      />
     </div>
   );
 };
-
 export default App;

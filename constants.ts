@@ -1,67 +1,47 @@
-// Models
-export const MODEL_LIVE = 'gemini-2.5-flash-native-audio-preview-12-2025';
-export const MODEL_TRANSCRIBE = 'gemini-3-flash-preview';
-export const MODEL_FAST = 'gemini-flash-lite-latest'; // Mapped from 2.5-flash-lite requirement
-export const MODEL_TTS = 'gemini-2.5-flash-preview-tts';
-export const MODEL_SEARCH = 'gemini-3-flash-preview'; // For grounding
-export const MODEL_FLASH = 'gemini-3-flash-preview';
+export const APP_NAME = 'ListeningProject';
+export const APP_VERSION = '2.1.0';
 
-// Audio defaults
+// Model IDs
+export const MODEL_LIVE = 'gemini-2.0-flash-exp';
+export const MODEL_TTS = 'gemini-1.5-flash';
+export const MODEL_TRANSCRIBE = 'gemini-1.5-flash';
+export const MODEL_FAST_TRANSLATE = 'gemini-1.5-flash';
+export const MODEL_SEARCH = 'gemini-1.5-pro';
+
+// Audio Settings
 export const INPUT_SAMPLE_RATE = 16000;
 export const OUTPUT_SAMPLE_RATE = 24000;
 
 export const LANGUAGES = [
-  { code: 'English', label: 'English' },
-  { code: 'Spanish', label: 'Spanish' },
-  { code: 'Chinese (Mandarin)', label: 'Chinese (Mandarin)' },
-  { code: 'Chinese (Cantonese)', label: 'Chinese (Cantonese)' },
-  { code: 'Tagalog', label: 'Tagalog (Filipino)' },
-  { code: 'Vietnamese', label: 'Vietnamese' },
-  { code: 'Arabic', label: 'Arabic' },
-  { code: 'French', label: 'French' },
-  { code: 'Korean', label: 'Korean' },
-  { code: 'Russian', label: 'Russian' },
-  { code: 'German', label: 'German' },
-  { code: 'Haitian Creole', label: 'Haitian Creole' },
-  { code: 'Hindi', label: 'Hindi' },
-  { code: 'Portuguese', label: 'Portuguese' },
-  { code: 'Italian', label: 'Italian' },
-  { code: 'Polish', label: 'Polish' },
-  { code: 'Urdu', label: 'Urdu' },
-  { code: 'Japanese', label: 'Japanese' },
-  { code: 'Persian', label: 'Persian (Farsi)' },
-  { code: 'Gujarati', label: 'Gujarati' },
-  { code: 'Telugu', label: 'Telugu' },
-  { code: 'Bengali', label: 'Bengali' },
-  { code: 'Thai', label: 'Thai' },
-  { code: 'Greek', label: 'Greek' },
-  { code: 'Punjabi', label: 'Punjabi' },
-  { code: 'Tamil', label: 'Tamil' },
-  { code: 'Armenian', label: 'Armenian' },
-  { code: 'Serbo-Croatian', label: 'Serbo-Croatian' },
-  { code: 'Hebrew', label: 'Hebrew' },
-  { code: 'Hmong', label: 'Hmong' },
-  { code: 'Khmer', label: 'Khmer' },
-  { code: 'Navajo', label: 'Navajo' },
-  { code: 'Hungarian', label: 'Hungarian' },
-  { code: 'Lao', label: 'Lao' },
-  { code: 'Yiddish', label: 'Yiddish' },
-  { code: 'Malayalam', label: 'Malayalam' },
-  { code: 'Swahili', label: 'Swahili' },
-  { code: 'Amharic', label: 'Amharic' },
-  { code: 'Somali', label: 'Somali' },
-  { code: 'Nepali', label: 'Nepali' },
-  { code: 'Ukrainian', label: 'Ukrainian' },
-  { code: 'Dutch', label: 'Dutch' },
-  { code: 'Romanian', label: 'Romanian' },
-  { code: 'Indonesian', label: 'Indonesian' },
-  { code: 'Turkish', label: 'Turkish' },
-  { code: 'Ilocano', label: 'Ilocano' },
-  { code: 'Yoruba', label: 'Yoruba' },
-  { code: 'Igbo', label: 'Igbo' },
-  { code: 'Marathi', label: 'Marathi' },
-  { code: 'Kannada', label: 'Kannada' },
-  { code: 'Oromo', label: 'Oromo' },
+  { code: 'en-US', label: 'English (US)' },
+  { code: 'en-GB', label: 'English (UK)' },
+  { code: 'es-ES', label: 'Spanish' },
+  { code: 'fr-FR', label: 'French' },
+  { code: 'de-DE', label: 'German' },
+  { code: 'it-IT', label: 'Italian' },
+  { code: 'ja-JP', label: 'Japanese' },
+  { code: 'ko-KR', label: 'Korean' },
+  { code: 'zh-CN', label: 'Chinese (Simplified)' },
+  { code: 'pt-BR', label: 'Portuguese' },
+  { code: 'ru-RU', label: 'Russian' },
+  { code: 'hi-IN', label: 'Hindi' },
+  { code: 'ar-XA', label: 'Arabic' },
+  { code: 'vi-VN', label: 'Vietnamese' },
+  { code: 'th-TH', label: 'Thai' },
+  { code: 'nl-NL', label: 'Dutch' },
+  { code: 'tr-TR', label: 'Turkish' },
 ];
 
-export const VOICES = ['Puck', 'Charon', 'Kore', 'Fenrir', 'Zephyr'];
+export const VOICES = [
+  { id: 'Puck', label: 'Puck (Energetic)' },
+  { id: 'Charon', label: 'Charon (Deep)' },
+  { id: 'Kore', label: 'Kore (Soft)' },
+  { id: 'Fenrir', label: 'Fenrir (Balanced)' },
+  { id: 'Aoede', label: 'Aoede (Musical)' },
+];
+
+export const NOISE_LEVELS = [
+  { id: 'off', label: 'Off' },
+  { id: 'low', label: 'Low (Indoor)' },
+  { id: 'high', label: 'High (Outdoor/Cafe)' },
+];

@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { Settings, VoiceName, NoiseLevel } from '../types';
 import { LANGUAGES, VOICES } from '../constants';
 import { X, Mic, Volume2, Globe, Download, Upload, Trash2, HardDrive } from 'lucide-react';
+import CustomSelect from './CustomSelect';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -43,6 +44,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  const languageOptions = LANGUAGES.map(lang => ({
+    value: lang.code,
+    label: lang.label
+  }));
+
+  const voiceOptions = VOICES.map(voice => ({
+    value: voice.id,
+    label: voice.label
+  }));
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
@@ -65,17 +76,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               <Globe size={18} />
               <label className="text-sm font-medium">Target Language</label>
             </div>
-            <select
+            <CustomSelect
               value={settings.targetLanguage}
-              onChange={(e) => onUpdate({ ...settings, targetLanguage: e.target.value })}
-              className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
-            >
-              {LANGUAGES.map((lang) => (
-                <option key={lang.code} value={lang.code}>
-                  {lang.label}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => onUpdate({ ...settings, targetLanguage: value })}
+              options={languageOptions}
+              className="w-full bg-slate-900 border-slate-600 justify-between px-4 py-3 rounded-lg"
+              position="down"
+            />
           </div>
 
           {/* Noise Cancellation */}
@@ -111,17 +118,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               <Volume2 size={18} />
               <label className="text-sm font-medium">AI Voice</label>
             </div>
-            <select
+            <CustomSelect
               value={settings.voice}
-              onChange={(e) => onUpdate({ ...settings, voice: e.target.value as VoiceName })}
-              className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
-            >
-              {VOICES.map((voice) => (
-                <option key={voice} value={voice}>
-                  {voice}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => onUpdate({ ...settings, voice: value as VoiceName })}
+              options={voiceOptions}
+              className="w-full bg-slate-900 border-slate-600 justify-between px-4 py-3 rounded-lg"
+              position="down"
+            />
           </div>
 
           {/* Auto Speak Toggle */}
