@@ -306,7 +306,7 @@ const App: React.FC = () => {
       <header className="flex-none p-4 bg-slate-900/50 backdrop-blur-md border-b border-slate-800 flex justify-between items-center z-10 pt-[env(safe-area-inset-top,20px)]">
         <div className="flex items-center gap-3">
           <img src="./icon.svg" alt="LP Logo" className="w-10 h-10" />
-          <h1 className="font-bold text-lg tracking-tight text-white">ListeningProject</h1>
+          <h1 className="font-bold text-lg tracking-tight text-white hidden sm:block">ListeningProject</h1>
           {connectedMics > 1 && (
             <div className="ml-2 bg-green-900/50 p-1 px-2 rounded-full border border-green-500/30 flex items-center gap-1">
               <Smartphone size={12} className="text-green-400" />
