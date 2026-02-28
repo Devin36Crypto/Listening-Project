@@ -10,21 +10,26 @@ class OfflineProcessor {
   static async getInstance(task: string, model: string, progress_callback?: (data: any) => void) {
     const key = `${task}-${model}`;
     if (!this.task_instances[key]) {
-      this.task_instances[key] = pipeline(task as any, model, { progress_callback });
+      this.task_instances[key] = await pipeline(task as any, model, { progress_callback });
     }
     return this.task_instances[key];
   }
 }
 
 self.addEventListener('message', async (event) => {
-  const { type, data } = event.data;
+  const { task, ...data } = event.data;
 
   try {
-    if (type === 'transcribe') {
+    if (task === 'transcribe') {
       const { audio, language } = data;
 
       const progress_callback = (progress: any) => {
-        self.postMessage({ status: 'loading', task: 'transcribe', progress: progress.progress, file: progress.file });
+        self.postMessage({
+          type: 'status',
+          status: 'loading',
+          message: `Loading model: ${progress.file}`,
+          progress: progress.progress
+        });
       };
 
       const transcriber = await OfflineProcessor.getInstance(
@@ -41,13 +46,22 @@ self.addEventListener('message', async (event) => {
         return_timestamps: true,
       });
 
-      self.postMessage({ status: 'complete', task: 'transcribe', output });
+      self.postMessage({
+        type: 'result',
+        status: 'ready',
+        result: { task: 'transcribe', output }
+      });
 
-    } else if (type === 'translate') {
-      const { text, source_lang, target_lang } = data;
+    } else if (task === 'translate') {
+      const { text, source, target } = data;
 
       const progress_callback = (progress: any) => {
-        self.postMessage({ status: 'loading', task: 'translate', progress: progress.progress, file: progress.file });
+        self.postMessage({
+          type: 'status',
+          status: 'loading',
+          message: `Loading model: ${progress.file}`,
+          progress: progress.progress
+        });
       };
 
       const translator = await OfflineProcessor.getInstance(
@@ -57,13 +71,21 @@ self.addEventListener('message', async (event) => {
       );
 
       const output = await translator(text, {
-        src_lang: source_lang,
-        tgt_lang: target_lang,
+        src_lang: source,
+        tgt_lang: target,
       });
 
-      self.postMessage({ status: 'complete', task: 'translate', output });
+      self.postMessage({
+        type: 'result',
+        status: 'ready',
+        result: { task: 'translate', output }
+      });
     }
   } catch (error: any) {
-    self.postMessage({ status: 'error', error: error.message });
+    self.postMessage({
+      type: 'status',
+      status: 'error',
+      message: error.message
+    });
   }
 });

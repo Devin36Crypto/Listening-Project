@@ -5,9 +5,8 @@ export enum AppMode {
   OFFLINE_MODE = 'OFFLINE_MODE',
   LOCKED = 'LOCKED'
 }
-
 export type NoiseLevel = 'off' | 'low' | 'high';
-
+export type VoiceName = 'Puck' | 'Charon' | 'Kore' | 'Fenrir' | 'Aoede';
 export interface Settings {
   targetLanguage: string;
   voice: string;
@@ -15,7 +14,6 @@ export interface Settings {
   noiseCancellationLevel: NoiseLevel;
   pushToTalk: boolean;
 }
-
 export interface LogMessage {
   id: string;
   role: 'user' | 'model' | 'system' | 'date-marker';
@@ -24,7 +22,6 @@ export interface LogMessage {
   isError?: boolean;
   speakerId?: string;
 }
-
 export interface Session {
   id: string;
   startTime: Date;
@@ -33,10 +30,4 @@ export interface Session {
   targetLanguage: string;
   logs: LogMessage[];
   speakerRegistry: Record<string, string>;
-}
-
-export interface Speaker {
-  id: string;
-  name: string;
-  color: string;
 }

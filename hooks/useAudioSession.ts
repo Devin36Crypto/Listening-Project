@@ -204,23 +204,35 @@ export function useAudioSession(
             addLog('system', 'Initializing Neural Interface...');
             await requestWakeLock();
             enableBackgroundMode();
+
             const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
             audioContextInput.current = new AudioContextClass({ sampleRate: INPUT_SAMPLE_RATE });
             audioContextOutput.current = new AudioContextClass({ sampleRate: OUTPUT_SAMPLE_RATE });
+
             await audioContextInput.current.resume();
             await audioContextOutput.current.resume();
+
             const workletNode = await initializeMultiInputAudio(audioContextInput.current);
             workletNodeRef.current = workletNode;
+
             const finalApiKey = apiKeyProp === 'STUDIO_MANAGED' ? undefined : (apiKeyProp || undefined);
             const ai = new GoogleGenAI({ apiKey: finalApiKey });
+
             const translatorInstruction = `You are "ListeningProject".
 CORE PROTOCOLS:
-1. UNIVERSAL TRANSLATOR: Translate EVERYTHING into **${settings.targetLanguage}**.
+1. UNIVERSAL TRANSLATOR: Translate EVERYTHING you hear into the target language (**${settings.targetLanguage}**).
 2. MULTI-LANGUAGE SCANNING: Listen for ANY and ALL languages.
 3. SPEAKER ID: Start EVERY output line with [Speaker Label]:.
    Example: [Spanish Speaker 1]: The translation goes here.
-4. If you hear the target language, transcribe verbatim.`;
-            const assistantInstruction = `You are "ListeningProject". Identify speakers with [Speaker Name]: format. Answer in **${settings.targetLanguage}**.`;
+4. TARGET-LANGUAGE HANDLING: If you hear the target language, transcribe it verbatim to preserve the record.
+5. NO LATENCY: Provide the translation as soon as the speaker begins. Do not wait for long pauses.`;
+
+            const assistantInstruction = `You are "ListeningProject Assistant". 
+CORE PROTOCOLS:
+1. SPEAKER TRACKING: Identify speakers with [Speaker Name]: format.
+2. CONTEXTUAL AWARENESS: Use integrated search grounding to explain cultural references or terms mentioned in the audio.
+3. LANGUAGE: Always respond in the user's selected target language (**${settings.targetLanguage}**).`;
+
             const sessionPromise = ai.live.connect({
                 model: MODEL_LIVE,
                 config: {

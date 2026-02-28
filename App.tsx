@@ -132,6 +132,7 @@ const App: React.FC = () => {
   const initializeApiKey = useCallback(async () => {
     // 1. Check environment variables
     let key = import.meta.env.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : null);
+    
     // 2. Check LocalStorage
     if (!key) {
       key = localStorage.getItem('gemini_api_key');
@@ -306,7 +307,9 @@ const App: React.FC = () => {
       <header className="flex-none p-4 bg-slate-900/50 backdrop-blur-md border-b border-slate-800 flex justify-between items-center z-10 pt-[env(safe-area-inset-top,20px)]">
         <div className="flex items-center gap-3">
           <img src="./icon.svg" alt="LP Logo" className="w-10 h-10" />
-          <h1 className="font-bold text-lg tracking-tight text-white hidden sm:block">ListeningProject</h1>
+          <div className="flex flex-col">
+            <h1 className="font-bold text-lg tracking-tight text-white leading-none hidden sm:block">ListeningProject</h1>
+          </div>
           {connectedMics > 1 && (
             <div className="ml-2 bg-green-900/50 p-1 px-2 rounded-full border border-green-500/30 flex items-center gap-1">
               <Smartphone size={12} className="text-green-400" />
@@ -324,8 +327,8 @@ const App: React.FC = () => {
           </button>
           <button
             onClick={() => setIsPocketMode(true)}
-            className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white"
-            title="Enter Pocket Mode"
+            className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white lg:hidden"
+            title="Lock Screen"
           >
             <LucideLock size={20} />
           </button>
@@ -547,6 +550,7 @@ const App: React.FC = () => {
               <span className="text-[10px] text-slate-400 mt-1 text-center">Transcript</span>
             </div>
           </div>
+          
           <p className="text-center text-xs text-slate-500 mt-6 pb-2">
             {isRecording
               ? activeMode === AppMode.LIVE_TRANSLATOR
