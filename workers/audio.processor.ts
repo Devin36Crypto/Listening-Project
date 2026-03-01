@@ -1,21 +1,37 @@
 /**
- * AudioWorkletProcessor for handling real-time audio input on a separate thread.
- * This prevents UI jank and ensures consistent audio sampling.
+ * Optimized AudioWorkletProcessor for high-performance audio ingestion.
+ * Performs PCM16 conversion and Silence Suppression to reduce CPU/Bandwidth.
  */
 class AudioProcessor extends AudioWorkletProcessor {
+    private silenceThreshold = 0.002; // RMS threshold
+
     process(inputs: Float32Array[][]) {
-        // inputs[0] is the 1st input (our merger node)
         const input = inputs[0];
         if (input && input.length > 0) {
-            // We take the first channel of the first input
             const channelData = input[0];
 
-            // Post the raw Float32Array to the main thread
-            // Using a copy (slice) to avoid modification issues
-            this.port.postMessage(channelData.slice());
+            // 1. SILENCE SUPPRESSION (Peak/RMS Check)
+            let sumSquare = 0;
+            for (let i = 0; i < channelData.length; i++) {
+                sumSquare += channelData[i] * channelData[i];
+            }
+            const rms = Math.sqrt(sumSquare / channelData.length);
+
+            // Skip processing if below threshold (gate)
+            if (rms < this.silenceThreshold) return true;
+
+            // 2. PCM16 CONVERSION (In-place/Vectorizable approach)
+            const pcm16 = new Int16Array(channelData.length);
+            for (let i = 0; i < channelData.length; i++) {
+                // Clamp and scale to 16-bit range
+                const s = Math.max(-1, Math.min(1, channelData[i]));
+                pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+            }
+
+            // 3. TRANSFERABLE (Zero-copy transfer to main thread)
+            this.port.postMessage(pcm16, [pcm16.buffer]);
         }
 
-        // Return true to keep the processor alive
         return true;
     }
 }

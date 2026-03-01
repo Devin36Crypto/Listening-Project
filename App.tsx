@@ -33,6 +33,74 @@ import { useOfflineWorker } from './hooks/useOfflineWorker';
 import { useAudioSession } from './hooks/useAudioSession';
 import { saveSession, importSessions, clearAllSessions, getStorageUsage } from './services/db';
 import { getSpeakerColor, getSpeakerInitials } from './utils/colors';
+// --- Memoized Components for Performance ---
+const ChatMessage = React.memo(({
+  msg,
+  speakerName,
+  onSpeakerClick,
+  getSpeakerColor,
+  getSpeakerInitials
+}: {
+  msg: LogMessage;
+  speakerName: string;
+  onSpeakerClick: (id: string) => void;
+  getSpeakerColor: (id: string) => string;
+  getSpeakerInitials: (name: string) => string;
+}) => {
+  if (msg.role === 'date-marker') {
+    return (
+      <div className="flex justify-center py-4">
+        <span className="bg-slate-800/50 text-slate-400 text-[10px] px-3 py-1 rounded-full border border-slate-700/50 font-mono tracking-widest uppercase">
+          {msg.text}
+        </span>
+      </div>
+    );
+  }
+
+  const isUser = msg.role === 'user';
+  const isModel = msg.role === 'model';
+  const isSystem = msg.role === 'system';
+
+  return (
+    <div className={`flex w-full mb-6 ${isUser ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
+      <div className={`max-w-[85%] flex flex-col gap-1.5 ${isUser ? 'items-end' : 'items-start'}`}>
+        <div className={`flex items-center gap-2 text-[10px] text-slate-400 mb-0.5 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+          {(msg.speakerId || isModel) && (
+            <button
+              onClick={() => msg.speakerId && onSpeakerClick(msg.speakerId)}
+              className="flex items-center gap-2 hover:bg-white/5 rounded-full pr-2 py-0.5 transition-all group"
+              disabled={!msg.speakerId}
+            >
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white shadow-sm transition-transform group-hover:scale-110 ${msg.speakerId ? getSpeakerColor(msg.speakerId) : 'bg-blue-600'}`}>
+                {msg.speakerId ? getSpeakerInitials(speakerName) : 'AI'}
+              </div>
+              <span className="font-semibold text-slate-300 group-hover:text-blue-400 transition-colors">
+                {isModel ? 'AI Assistant' : speakerName}
+              </span>
+            </button>
+          )}
+          <span className="opacity-30">•</span>
+          <span className="font-mono text-[9px] opacity-50">
+            {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+          </span>
+        </div>
+
+        <div className={`relative px-4 py-3 rounded-2xl shadow-xl transition-all ${msg.isError
+          ? 'bg-red-900/20 border border-red-500/30 text-red-200'
+          : isUser
+            ? 'bg-blue-600 text-white rounded-tr-none shadow-blue-500/10'
+            : isSystem
+              ? 'bg-slate-900/80 text-slate-400 text-[11px] border border-slate-800 font-mono italic'
+              : 'bg-slate-900/60 backdrop-blur-md text-slate-100 rounded-tl-none border border-white/5'
+          }`}>
+          {msg.isError && <VolumeX size={14} className="absolute -left-6 top-4 text-red-500 animate-pulse" />}
+          <div className="whitespace-pre-wrap leading-relaxed text-[13px]">{msg.text}</div>
+        </div>
+      </div>
+    </div>
+  );
+});
+
 const App: React.FC = () => {
   // --- UI State ---
   const [activeMode, setActiveMode] = useState<AppMode>(AppMode.LIVE_TRANSLATOR);
@@ -274,58 +342,62 @@ const App: React.FC = () => {
   }, [logs, currentSessionId, activeMode, settings.targetLanguage, speakerRegistry, vaultKey, addLog]);
   if (!apiKey) {
     return (
-      <div className="flex flex-col h-screen bg-[#0f172a] text-slate-200 items-center justify-center p-6 text-center">
-        <div className="w-20 h-20 bg-blue-600/20 rounded-full flex items-center justify-center mb-6 border border-blue-500/30">
-          <Key size={40} className="text-blue-400" />
-        </div>
-        <h1 className="text-2xl font-bold text-white mb-2">API Key Required</h1>
-        <p className="text-slate-400 max-w-md mb-8">
-          To use the ListeningProject Live features, you need to connect a Google Gemini API key.
-        </p>
-        <button
-          onClick={handleConnectApiKey}
-          className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-blue-900/20 flex items-center gap-2 mb-8"
-        >
-          <Key size={18} />
-          Connect Google AI Studio
-        </button>
-        <div className="w-full max-w-sm border-t border-slate-800 pt-8">
-          <p className="text-sm text-slate-400 mb-4">Or enter your API key manually:</p>
-          <div className="flex gap-2">
-            <input
-              type="password"
-              value={manualKey}
-              onChange={(e) => setManualKey(e.target.value)}
-              placeholder="Paste API Key here..."
-              className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
-            />
-            <button
-              onClick={handleSaveManualKey}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg border border-slate-700 transition-colors"
-            >
-              Save
-            </button>
+      <div className="flex flex-col h-screen animate-ambient text-slate-200 items-center justify-center p-6 text-center">
+        <div className="glass-panel p-10 rounded-3xl shadow-2xl max-w-sm w-full flex flex-col items-center">
+          <div className="w-20 h-20 bg-blue-600/20 rounded-full flex items-center justify-center mb-6 border border-blue-500/30 shadow-[0_0_30px_rgba(59,130,246,0.2)]">
+            <Key size={40} className="text-blue-400" />
           </div>
+          <h1 className="text-2xl font-bold text-white mb-2 text-xl">ListeningProject</h1>
+          <p className="text-slate-400 mb-8 text-xs leading-relaxed">
+            Secure connection required. Please connect your Google AI Studio account or provide an API Key.
+          </p>
+          <button
+            onClick={handleConnectApiKey}
+            className="w-full px-6 py-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-2xl transition-all shadow-lg shadow-blue-900/40 flex items-center justify-center gap-2 mb-8 mic-glow"
+          >
+            <Key size={18} />
+            Connect Google AI Studio
+          </button>
+          <div className="w-full border-t border-white/5 pt-8">
+            <p className="text-[10px] text-slate-500 mb-4 uppercase tracking-widest font-bold">Manual API Key</p>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={manualKey}
+                onChange={(e) => setManualKey(e.target.value)}
+                placeholder="Paste Key here..."
+                className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50 transition-colors"
+              />
+              <button
+                onClick={handleSaveManualKey}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+          <p className="mt-8 text-[10px] text-slate-600">
+            <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-400">
+              Privacy & Billing Policy
+            </a>
+          </p>
         </div>
-        <p className="mt-8 text-xs text-slate-500">
-          <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-300">
-            Learn more about billing and API keys
-          </a>
-        </p>
       </div>
     );
   }
+
   return (
-    <div className="flex flex-col h-screen bg-[#0f172a] text-slate-200 safe-area-inset">
+    <div className="flex flex-col h-screen animate-ambient text-slate-200 safe-area-inset overflow-hidden selection:bg-blue-500/30">
       <PocketModeOverlay
         isActive={isPocketMode}
         onUnlock={() => setIsPocketMode(false)}
         statusText={isRecording ? `ListeningProject Live: ${connectedMics} Sensors Active` : 'ListeningProject Standby'}
       />
+
       {/* Header */}
-      <header className="flex-none p-4 bg-slate-900/50 backdrop-blur-md border-b border-slate-800 flex justify-between items-center z-10 pt-[env(safe-area-inset-top,20px)]">
+      <header className="flex-none p-4 glass-panel backdrop-blur-3xl border-b border-white/5 flex justify-between items-center z-10 pt-[env(safe-area-inset-top,20px)] mx-4 mt-4 rounded-2xl shadow-2xl">
         <div className="flex items-center gap-3">
-          <img src="./icon.svg" alt="LP Logo" className="w-10 h-10" />
+          <img src="./icon.svg" alt="LP Logo" className="w-10 h-10 drop-shadow-lg" />
           <div className="flex flex-col">
             <h1 className="font-bold text-lg tracking-tight text-white leading-none">ListeningProject</h1>
           </div>
@@ -401,53 +473,16 @@ const App: React.FC = () => {
               </p>
             </div>
           ) : (
-            logs.map(msg => {
-              if (msg.role === 'date-marker') {
-                return (
-                  <div key={msg.id} className="flex justify-center py-4">
-                    <span className="bg-slate-800/50 text-slate-400 text-xs px-3 py-1 rounded-full border border-slate-700/50 font-mono">
-                      {msg.text}
-                    </span>
-                  </div>
-                );
-              }
-              return (
-                <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className="max-w-[85%] flex flex-col gap-1">
-                    <div className={`flex items-center gap-2 text-[10px] text-slate-400 mb-1 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      {(msg.speakerId || msg.role === 'model') && (
-                        <button
-                          onClick={() => msg.speakerId && handleSpeakerClick(msg.speakerId)}
-                          className="flex items-center gap-2 hover:bg-slate-800/50 rounded-full pr-2 py-0.5 transition-colors group"
-                          disabled={!msg.speakerId}
-                        >
-                          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white shadow-sm ${msg.speakerId ? getSpeakerColor(msg.speakerId) : 'bg-blue-600'
-                            }`}>
-                            {msg.speakerId ? getSpeakerInitials(speakerRegistry[msg.speakerId] || msg.speakerId) : 'AI'}
-                          </div>
-                          <span className="font-semibold text-slate-300 group-hover:text-blue-400 transition-colors">
-                            {msg.speakerId ? (speakerRegistry[msg.speakerId] || msg.speakerId) : 'AI Assistant'}
-                          </span>
-                        </button>
-                      )}
-                      <span className="opacity-50">•</span>
-                      <span>{msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-                    </div>
-                    <div className={`rounded-2xl p-4 shadow-sm ${msg.isError
-                      ? 'bg-red-900/20 border border-red-500/50 text-red-200'
-                      : msg.role === 'user'
-                        ? 'bg-blue-600 text-white rounded-br-none'
-                        : msg.role === 'system'
-                          ? 'bg-slate-800/50 text-slate-400 text-sm border border-slate-700 font-mono'
-                          : 'bg-slate-800 text-slate-100 rounded-bl-none border border-slate-700'
-                      }`}>
-                      {msg.isError && <VolumeX size={16} className="mt-1 flex-shrink-0 text-red-400 mb-1" />}
-                      <div className="whitespace-pre-wrap">{msg.text}</div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })
+            logs.map(msg => (
+              <ChatMessage
+                key={msg.id}
+                msg={msg}
+                speakerName={speakerRegistry[msg.speakerId || ''] || msg.speakerId || ''}
+                onSpeakerClick={handleSpeakerClick}
+                getSpeakerColor={getSpeakerColor}
+                getSpeakerInitials={getSpeakerInitials}
+              />
+            ))
           )}
           <div ref={logsEndRef} />
         </div>
@@ -539,20 +574,20 @@ const App: React.FC = () => {
                 if (settings.pushToTalk && isRecording) toggleRecording();
               }}
               onClick={() => { if (!settings.pushToTalk) toggleRecording(); }}
-              className={`relative w-20 h-20 rounded-full flex items-center justify-center shadow-lg shadow-blue-900/20 transition-all transform ${settings.pushToTalk ? 'active:scale-90' : 'hover:scale-105 active:scale-95'
-                } ${isRecording
-                  ? activeMode === AppMode.OFFLINE_MODE
-                    ? 'bg-orange-500 hover:bg-orange-600 animate-pulse'
-                    : 'bg-red-500 hover:bg-red-600 animate-pulse'
-                  : 'bg-white hover:bg-slate-100'
+              className={`relative w-24 h-24 rounded-full flex items-center justify-center transition-all transform hover:scale-105 active:scale-95 ${isRecording
+                ? activeMode === AppMode.OFFLINE_MODE
+                  ? 'bg-orange-500 mic-recording'
+                  : 'bg-gradient-to-br from-red-500 to-rose-600 mic-recording'
+                : 'bg-white mic-glow text-slate-900'
                 }`}
             >
+              <div className="absolute inset-0 rounded-full bg-inherit blur-md opacity-20 animate-pulse" />
               {isRecording ? (
-                <MicOff size={32} className="text-white" />
+                <MicOff size={36} className="text-white relative z-10" />
               ) : (
                 activeMode === AppMode.OFFLINE_MODE
-                  ? <WifiOff size={32} className="text-slate-900" />
-                  : <Mic size={32} className="text-slate-900" />
+                  ? <WifiOff size={36} className="text-slate-900 relative z-10" />
+                  : <Mic size={36} className="text-slate-900 relative z-10" />
               )}
             </button>
             {/* Transcript Toggle */}

@@ -2,22 +2,29 @@
  * Converts Float32Array audio data (standard in Web Audio API) 
  * to 16-bit Linear PCM base64 string (required by Google Gemini API).
  */
-export function createPcmBase64(data: Float32Array): string {
-    const pcm = new Int16Array(data.length);
-    for (let i = 0; i < data.length; i++) {
-        // Clamp and scale to 16-bit range
-        const s = Math.max(-1, Math.min(1, data[i]));
-        pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-    }
-    
-    // Convert Int16Array buffer to binary string
+/**
+ * Converts Int16Array (PCM16) to 16-bit Linear PCM base64 string.
+ * Optimized for speed by using a TypedArray view.
+ */
+export function createPcmBase64(data: Int16Array): string {
+    const bytes = new Uint8Array(data.buffer);
     let binary = '';
-    const bytes = new Uint8Array(pcm.buffer);
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
+    for (let i = 0; i < bytes.byteLength; i++) {
         binary += String.fromCharCode(bytes[i]);
     }
     return window.btoa(binary);
+}
+
+/**
+ * Legacy/Float version for non-worklet use-cases (if any).
+ */
+export function createPcmBase64FromFloat32(data: Float32Array): string {
+    const pcm = new Int16Array(data.length);
+    for (let i = 0; i < data.length; i++) {
+        const s = Math.max(-1, Math.min(1, data[i]));
+        pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    }
+    return createPcmBase64(pcm);
 }
 
 /**
@@ -43,11 +50,10 @@ export async function decodeAudioData(
     // Some browsers might require the standard decodeAudioData which returns a promise
     // but expects an ArrayBuffer
     try {
-        return await ctx.decodeAudioData(data.buffer);
+        return await ctx.decodeAudioData(data.buffer as ArrayBuffer);
     } catch (e) {
-        // Fallback for raw PCM if the model returns it (though Gemini usually returns AAC/Opus in base64)
         const floatData = new Float32Array(data.length / 2);
-        const view = new DataView(data.buffer);
+        const view = new DataView(data.buffer as ArrayBuffer);
 
         for (let i = 0; i < floatData.length; i++) {
             floatData[i] = view.getInt16(i * 2, true) / 0x7FFF;

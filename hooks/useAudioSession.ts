@@ -265,7 +265,9 @@ CORE PROTOCOLS:
                     onopen: () => {
                         setIsRecording(true);
                         workletNode.port.onmessage = (e) => {
-                            const base64 = createPcmBase64(e.data);
+                            // Data is now pre-converted to Int16Array in the worker
+                            const pcm16 = e.data as Int16Array;
+                            const base64 = createPcmBase64(pcm16);
                             sessionPromiseRef.current?.then(session => session.sendRealtimeInput({
                                 media: {
                                     mimeType: `audio/pcm;rate=${INPUT_SAMPLE_RATE}`,
