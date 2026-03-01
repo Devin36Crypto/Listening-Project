@@ -1,23 +1,29 @@
-/**
- * AudioWorkletProcessor for handling real-time audio input on a separate thread.
- * This prevents UI jank and ensures consistent audio sampling.
- */
 class AudioProcessor extends AudioWorkletProcessor {
-    process(inputs: Float32Array[][]) {
-        // inputs[0] is the 1st input (our merger node)
-        const input = inputs[0];
-        if (input && input.length > 0) {
-            // We take the first channel of the first input
-            const channelData = input[0];
+  private silenceThreshold = 0.002;
 
-            // Post the raw Float32Array to the main thread
-            // Using a copy (slice) to avoid modification issues
-            this.port.postMessage(channelData.slice());
-        }
+  process(inputs: Float32Array[][]) {
+    const input = inputs[0];
+    if (input && input.length > 0) {
+      const channelData = input[0];
+      
+      let sumSquare = 0;
+      for (let i = 0; i < channelData.length; i++) {
+        sumSquare += channelData[i] * channelData[i];
+      }
+      const rms = Math.sqrt(sumSquare / channelData.length);
+      
+      if (rms < this.silenceThreshold) return true;
 
-        // Return true to keep the processor alive
-        return true;
+      const pcm16 = new Int16Array(channelData.length);
+      for (let i = 0; i < channelData.length; i++) {
+        const s = Math.max(-1, Math.min(1, channelData[i]));
+        pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+      }
+      
+      this.port.postMessage(pcm16, [pcm16.buffer]);
     }
+    return true;
+  }
 }
 
 registerProcessor('audio-processor', AudioProcessor);

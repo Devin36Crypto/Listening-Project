@@ -1,9 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { Settings, AppMode, NoiseLevel } from '../types';
-import { createPcmBase64, decodeBase64, decodeAudioData } from '../utils/audio';
+import { createPcmBase64, decodeAudioData, decodeBase64 } from '../utils/audio';
 import { MODEL_LIVE, INPUT_SAMPLE_RATE, OUTPUT_SAMPLE_RATE } from '../constants';
 import audioProcessorUrl from '../workers/audio.processor.ts?url';
+
 type AddLogFn = (
     role: 'user' | 'model' | 'system' | 'date-marker',
     text: string,
@@ -186,14 +187,18 @@ export function useAudioSession(
                     t.stop();
                     t.enabled = false;
                 });
-            } catch (e) { }
+            } catch (e) {
+                console.debug('Failed to stop track:', e);
+            }
         });
         activeStreamsRef.current = [];
         try {
             if (audioContextInput.current && audioContextInput.current.state !== 'closed') {
                 audioContextInput.current.close().catch(() => { });
             }
-        } catch (e) { }
+        } catch (e) {
+            console.debug('Failed to close input context:', e);
+        }
         audioContextInput.current = null;
     }, []);
     const startSession = async () => {
@@ -313,7 +318,9 @@ CORE PROTOCOLS:
             if (audioContextOutput.current && audioContextOutput.current.state !== 'closed') {
                 audioContextOutput.current.close()?.catch(() => { });
             }
-        } catch (e) { }
+        } catch (e) {
+            console.debug('Failed to close output context:', e);
+        }
         audioContextOutput.current = null;
         if (currentOutputTranscription.current.trim()) {
             addLog('model', currentOutputTranscription.current.trim());
@@ -356,7 +363,7 @@ CORE PROTOCOLS:
         addLog('system', 'Processing offline audio...');
         onOfflineChunks(offlineChunksRef.current);
         offlineChunksRef.current = [];
-    }, [disableBackgroundMode, onOfflineChunks]);
+    }, [disableBackgroundMode, onOfflineChunks, teardownAudio, addLog]);
     // Cleanup on unmount
     useEffect(() => {
         return () => {

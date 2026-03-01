@@ -129,6 +129,16 @@ const App: React.FC = () => {
     []
   );
   // --- Consolidated API Key Initialization & Privacy Vault Logic ---
+  const handleConnectApiKey = useCallback(async () => {
+    if (window.aistudio && window.aistudio.openSelectKey) {
+      await window.aistudio.openSelectKey();
+      // Assume success after dialog closes (race condition mitigation)
+      setApiKey('STUDIO_MANAGED');
+    } else {
+      alert("API Key selection is not available in this environment. Please set VITE_GEMINI_API_KEY in .env");
+    }
+  }, []);
+
   const initializeApiKey = useCallback(async () => {
     // 1. Check environment variables
     let key = import.meta.env.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : null);
@@ -155,19 +165,10 @@ const App: React.FC = () => {
         setShowVaultModal(true);
       }
     }
-  }, []);
+  }, [handleConnectApiKey]);
   useEffect(() => {
     initializeApiKey();
   }, [initializeApiKey]);
-  const handleConnectApiKey = async () => {
-    if (window.aistudio && window.aistudio.openSelectKey) {
-      await window.aistudio.openSelectKey();
-      // Assume success after dialog closes (race condition mitigation)
-      setApiKey('STUDIO_MANAGED');
-    } else {
-      alert("API Key selection is not available in this environment. Please set VITE_GEMINI_API_KEY in .env");
-    }
-  };
   const handleSaveManualKey = () => {
     if (manualKey.trim().length > 10) {
       localStorage.setItem('gemini_api_key', manualKey.trim());
@@ -299,6 +300,7 @@ const App: React.FC = () => {
   return (
     <div className="flex flex-col h-screen bg-[#0f172a] text-slate-200 safe-area-inset">
       <PocketModeOverlay
+        key={isPocketMode ? 'active' : 'inactive'}
         isActive={isPocketMode}
         onUnlock={() => setIsPocketMode(false)}
         statusText={isRecording ? `ListeningProject Live: ${connectedMics} Sensors Active` : 'ListeningProject Standby'}
@@ -366,14 +368,14 @@ const App: React.FC = () => {
         {/* Logs */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-32">
           {!showTranscript ? (
-            <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-6">
+            <div className="h-full flex flex-col items-center justify-start pt-32 text-slate-500 space-y-6">
               <div className="w-24 h-24 rounded-full bg-slate-800/30 border border-slate-800 flex items-center justify-center animate-pulse">
                 <Search size={40} className="text-slate-600" />
               </div>
               <p className="text-sm font-medium">Transcript Hidden</p>
             </div>
           ) : logs.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-4">
+            <div className="h-full flex flex-col items-center justify-start pt-32 text-slate-500 space-y-4">
               <div className="w-20 h-20 rounded-full bg-slate-800/50 flex items-center justify-center mb-2">
                 <Search size={32} className="opacity-50" />
               </div>
@@ -658,6 +660,7 @@ const App: React.FC = () => {
         }}
       />
       <VaultKeyModal
+        key={showVaultModal ? 'open' : 'closed'}
         isOpen={showVaultModal}
         onClose={() => setShowVaultModal(false)}
         currentKey={vaultKey}

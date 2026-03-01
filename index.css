@@ -5,45 +5,45 @@
 :root {
   --safe-area-inset-top: env(safe-area-inset-top, 0px);
   --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --glass-bg: rgba(9, 9, 11, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.08);
 }
 
 body {
-  @apply bg-black text-white antialiased overflow-hidden;
+  @apply bg-[#020617] text-slate-100 antialiased overflow-hidden selection:bg-blue-500/30;
   padding-top: var(--safe-area-inset-top);
   padding-bottom: var(--safe-area-inset-bottom);
 }
 
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 4px;
+/* Premium Animations & Effects */
+.animate-ambient {
+  background: linear-gradient(-45deg, #020617, #0f172a, #1e1b4b, #020617);
+  background-size: 400% 400%;
+  animation: ambient-pulse 15s ease infinite;
 }
 
-::-webkit-scrollbar-track {
-  @apply bg-transparent;
+@keyframes ambient-pulse {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
-::-webkit-scrollbar-thumb {
-  @apply bg-zinc-800 rounded-full;
+.mic-glow {
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+  @apply transition-all duration-300;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  @apply bg-zinc-700;
+.mic-glow:hover {
+  box-shadow: 0 0 30px rgba(59, 130, 246, 0.4);
+  @apply scale-105;
 }
 
-/* Glassmorphism Utilities */
-.glass {
-  @apply bg-zinc-900/50 backdrop-blur-xl border border-white/10;
+.mic-recording {
+  box-shadow: 0 0 40px rgba(239, 68, 68, 0.5);
+  @apply animate-pulse;
 }
 
-.glass-dark {
-  @apply bg-black/60 backdrop-blur-2xl border border-white/5;
-}
-
-/* Safe Area Helpers */
-.pb-safe {
-  padding-bottom: var(--safe-area-inset-bottom);
-}
-
-.pt-safe {
-  padding-top: var(--safe-area-inset-top);
+.glass-panel {
+  @apply bg-zinc-950/40 backdrop-blur-2xl border border-white/5;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
 }

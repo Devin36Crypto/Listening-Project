@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Shield, Key, X, Eye, EyeOff, Lock, Unlock } from 'lucide-react';
 
 interface VaultKeyModalProps {
@@ -9,16 +9,9 @@ interface VaultKeyModalProps {
 }
 
 const VaultKeyModal: React.FC<VaultKeyModalProps> = ({ isOpen, onClose, currentKey, onSaveKey }) => {
-  const [keyInput, setKeyInput] = useState('');
+  const [keyInput, setKeyInput] = useState(currentKey || '');
   const [showKey, setShowKey] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      setKeyInput(currentKey || '');
-      setError(null);
-    }
-  }, [isOpen, currentKey]);
 
   if (!isOpen) return null;
 
@@ -47,26 +40,26 @@ const VaultKeyModal: React.FC<VaultKeyModalProps> = ({ isOpen, onClose, currentK
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="bg-slate-800 p-6 border-b border-slate-700 flex justify-between items-center sticky top-0 z-10">
+        <div className="flex-none p-6 border-b border-slate-800 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-blue-900/30 flex items-center justify-center border border-blue-500/30">
+            <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
               <Shield size={20} className="text-blue-400" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">Privacy Vault</h2>
+              <h2 className="text-xl font-bold text-white">Privacy Vault</h2>
               <p className="text-xs text-slate-400">End-to-End Encryption</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
+          <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white">
             <X size={24} />
           </button>
         </div>
 
         {/* Content */}
         <div className="p-6 space-y-6">
-          <div className="bg-blue-900/10 border border-blue-500/20 rounded-lg p-4">
+          <div className="bg-blue-900/10 border border-blue-500/20 rounded-xl p-4">
             <p className="text-sm text-blue-200 leading-relaxed">
               Set a <strong>Vault Key</strong> to encrypt your session history locally. Without this key, your saved transcripts cannot be read, even if the device is compromised.
             </p>
@@ -86,7 +79,7 @@ const VaultKeyModal: React.FC<VaultKeyModalProps> = ({ isOpen, onClose, currentK
                   setError(null);
                 }}
                 placeholder="Enter a secure passphrase..."
-                className="w-full bg-slate-900 border border-slate-600 rounded-xl py-3 pl-4 pr-12 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all placeholder:text-slate-500"
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 pl-4 pr-12 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all placeholder:text-slate-600"
                 autoFocus
               />
               <button
@@ -122,10 +115,10 @@ const VaultKeyModal: React.FC<VaultKeyModalProps> = ({ isOpen, onClose, currentK
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-slate-700 bg-slate-800 sticky bottom-0 flex gap-3">
+        <div className="flex-none p-6 border-t border-slate-800 bg-slate-900/80 sticky bottom-0 flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 py-3 rounded-xl bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors font-medium border border-slate-600"
+            className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors font-medium border border-slate-700"
           >
             Cancel
           </button>

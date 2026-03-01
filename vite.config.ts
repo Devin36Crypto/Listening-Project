@@ -1,4 +1,3 @@
-/// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -18,14 +17,16 @@ export default defineConfig({
         display: 'standalone',
         icons: [
           {
-            src: 'pwa-192x192.png',
+            src: 'icon.svg',
             sizes: '192x192',
-            type: 'image/png'
+            type: 'image/svg+xml',
+            purpose: 'any maskable'
           },
           {
-            src: 'pwa-512x512.png',
+            src: 'icon.svg',
             sizes: '512x512',
-            type: 'image/png'
+            type: 'image/svg+xml',
+            purpose: 'any maskable'
           }
         ]
       }
@@ -36,25 +37,15 @@ export default defineConfig({
       plugins: [tailwindcss, autoprefixer],
     },
   },
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: ['./vitest-setup.ts'],
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'json', 'html'],
-    },
-  },
   server: {
     port: 3000,
   },
   build: {
     rollupOptions: {
-      external: ['react', 'react-dom', '@google/genai', 'lucide-react'],
       output: {
-        globals: {
-          react: 'React',
-          'react-dom': 'ReactDOM',
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          genai: ['@google/genai'],
         },
       },
     },

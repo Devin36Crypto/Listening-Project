@@ -16,18 +16,7 @@ const PocketModeOverlay: React.FC<PocketModeOverlayProps> = ({ isActive, onUnloc
   const animationFrame = useRef<number | null>(null);
   const fadeTimeout = useRef<number | null>(null);
 
-  useEffect(() => {
-    if (!isActive) {
-      setProgress(0);
-      setIsPressing(false);
-      setIsVisible(false);
-    } else {
-      // Reset visibility when entering pocket mode
-      setIsVisible(false);
-    }
-  }, [isActive]);
-
-  const handleInteraction = () => {
+  const handleInteraction = useCallback(() => {
     // Reveal UI on interaction
     setIsVisible(true);
 
@@ -36,12 +25,25 @@ const PocketModeOverlay: React.FC<PocketModeOverlayProps> = ({ isActive, onUnloc
     fadeTimeout.current = window.setTimeout(() => {
       if (!isPressing) setIsVisible(false);
     }, 3000);
-  };
+  }, [isPressing]);
 
-  const handleStart = () => {
+  const handleEnd = useCallback(() => {
+    setIsPressing(false);
+    pressStartTime.current = null;
+    setProgress(0);
+    if (animationFrame.current) {
+      cancelAnimationFrame(animationFrame.current);
+      animationFrame.current = null;
+    }
+    // Restart fade timer
+    handleInteraction();
+  }, [handleInteraction]);
+
+  const handleStart = useCallback(() => {
     handleInteraction();
     setIsPressing(true);
-    pressStartTime.current = Date.now();
+    const now = Date.now();
+    pressStartTime.current = now;
 
     const updateProgress = () => {
       if (!pressStartTime.current) return;
@@ -59,19 +61,7 @@ const PocketModeOverlay: React.FC<PocketModeOverlayProps> = ({ isActive, onUnloc
     };
 
     animationFrame.current = requestAnimationFrame(updateProgress);
-  };
-
-  const handleEnd = () => {
-    setIsPressing(false);
-    pressStartTime.current = null;
-    setProgress(0);
-    if (animationFrame.current) {
-      cancelAnimationFrame(animationFrame.current);
-      animationFrame.current = null;
-    }
-    // Restart fade timer
-    handleInteraction();
-  };
+  }, [handleInteraction, handleEnd, onUnlock]);
 
   if (!isActive) return null;
 
