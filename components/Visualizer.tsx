@@ -14,6 +14,14 @@ const Visualizer: React.FC<VisualizerProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
 
+  // Configure analyser for time-domain waveform
+  useEffect(() => {
+    if (analyserNode && isActive) {
+      // eslint-disable-next-line react-compiler/react-compiler
+      analyserNode.fftSize = 1024;
+    }
+  }, [analyserNode, isActive]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -39,9 +47,7 @@ const Visualizer: React.FC<VisualizerProps> = ({
       return;
     }
 
-    // Configure analyser for time-domain waveform
-    analyserNode.fftSize = 1024;
-    const bufferLength = analyserNode.fftSize;
+    const bufferLength = 1024;
     const dataArray = new Uint8Array(bufferLength);
 
     let lastDrawTime = 0;

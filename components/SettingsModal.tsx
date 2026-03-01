@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { Settings, VoiceName, NoiseLevel } from '../types';
 import { LANGUAGES, VOICES } from '../constants';
-import { X, Mic, Volume2, Globe, Download, Upload, Trash2, HardDrive } from 'lucide-react';
+import { X, Mic, Volume2, Globe, Download, Upload, Trash2, HardDrive, Settings as SettingsIcon } from 'lucide-react';
 import CustomSelect from './CustomSelect';
 
 interface SettingsModalProps {
@@ -16,6 +16,7 @@ interface SettingsModalProps {
   canInstall?: boolean;
   onInstall?: () => void;
 }
+
 const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
@@ -64,15 +65,24 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       aria-modal="true"
       aria-labelledby="settings-modal-title"
     >
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl overflow-y-auto max-h-[90vh]">
-        <div className="flex justify-between items-center p-6 border-b border-slate-700 sticky top-0 bg-slate-800 z-10">
-          <h2 id="settings-modal-title" className="text-xl font-bold text-white">Translator Settings</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl overflow-y-auto max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="flex-none p-6 border-b border-slate-800 flex justify-between items-center sticky top-0 bg-slate-900 z-10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
+              <SettingsIcon size={20} className="text-blue-400" />
+            </div>
+            <div>
+              <h2 id="settings-modal-title" className="text-xl font-bold text-white">Translator Settings</h2>
+              <p className="text-xs text-slate-400">Configure your experience</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white">
             <X size={24} />
           </button>
         </div>
 
-        <div className="p-6 space-y-8">
+        <div className="p-6 space-y-8 flex-1">
           {/* PWA Install */}
           {canInstall && (
             <button
@@ -97,7 +107,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               value={settings.targetLanguage}
               onChange={(value) => onUpdate({ ...settings, targetLanguage: value })}
               options={languageOptions}
-              className="w-full bg-slate-900 border-slate-600 justify-between px-4 py-3 rounded-lg"
+              className="w-full bg-slate-950 border-slate-700 justify-between px-4 py-3 rounded-xl"
               position="down"
             />
           </div>
@@ -108,12 +118,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               <Mic size={18} />
               <label className="text-sm font-medium">Ambient Noise Cancellation</label>
             </div>
-            <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-600">
+            <div className="flex bg-slate-950 rounded-xl p-1 border border-slate-700">
               {(['off', 'low', 'high'] as NoiseLevel[]).map((level) => (
                 <button
                   key={level}
                   onClick={() => onUpdate({ ...settings, noiseCancellationLevel: level })}
-                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${settings.noiseCancellationLevel === level
+                  className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${settings.noiseCancellationLevel === level
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'text-slate-400 hover:text-slate-200'
                     }`}
@@ -139,13 +149,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               value={settings.voice}
               onChange={(value) => onUpdate({ ...settings, voice: value as VoiceName })}
               options={voiceOptions}
-              className="w-full bg-slate-900 border-slate-600 justify-between px-4 py-3 rounded-lg"
+              className="w-full bg-slate-950 border-slate-700 justify-between px-4 py-3 rounded-xl"
               position="down"
             />
           </div>
 
           {/* Auto Speak Toggle */}
-          <div className="flex items-center justify-between p-4 bg-slate-900 rounded-lg border border-slate-700/50">
+          <div className="flex items-center justify-between p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
             <span className="text-slate-300 text-sm font-medium">Auto-speak Translations</span>
             <button
               onClick={() => onUpdate({ ...settings, autoSpeak: !settings.autoSpeak })}
@@ -158,7 +168,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           {/* Push to Talk Toggle */}
-          <div className="flex items-center justify-between p-4 bg-slate-900 rounded-lg border border-slate-700/50">
+          <div className="flex items-center justify-between p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
             <div className="flex flex-col">
               <span className="text-slate-300 text-sm font-medium">Push to Talk Mode</span>
               <span className="text-slate-500 text-xs">Hold microphone to listen, release to stop</span>
@@ -174,7 +184,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           {/* Data Management */}
-          <div className="pt-4 border-t border-slate-700">
+          <div className="pt-4 border-t border-slate-800">
             <h3 className="text-sm font-semibold text-slate-400 mb-3 uppercase tracking-wider flex items-center justify-between">
               <span>Data Management</span>
               <span className="text-xs font-normal text-slate-500 flex items-center gap-1">
@@ -186,7 +196,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="grid grid-cols-2 gap-3 mb-3">
               <button
                 onClick={onExport}
-                className="flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 text-slate-200 py-3 rounded-lg transition-colors border border-slate-600"
+                className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 py-3 rounded-xl transition-colors border border-slate-700"
               >
                 <Download size={18} />
                 <span>Export</span>
@@ -194,7 +204,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 text-slate-200 py-3 rounded-lg transition-colors border border-slate-600"
+                className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 py-3 rounded-xl transition-colors border border-slate-700"
               >
                 <Upload size={18} />
                 <span>Import</span>
@@ -210,7 +220,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
             <button
               onClick={onClearData}
-              className="w-full flex items-center justify-center gap-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 hover:text-red-300 py-3 rounded-lg transition-colors border border-red-900/30"
+              className="w-full flex items-center justify-center gap-2 bg-red-900/10 hover:bg-red-900/20 text-red-400 hover:text-red-300 py-3 rounded-xl transition-colors border border-red-900/20"
             >
               <Trash2 size={18} />
               <span>Clear All Local Data</span>
@@ -222,10 +232,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
         </div>
 
-        <div className="p-6 border-t border-slate-700 bg-slate-800 sticky bottom-0">
+        <div className="flex-none p-6 border-t border-slate-800 bg-slate-900/80 sticky bottom-0">
           <button
             onClick={onClose}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-colors shadow-lg shadow-blue-900/20"
           >
             Done
           </button>

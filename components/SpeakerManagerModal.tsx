@@ -41,13 +41,19 @@ const SpeakerManagerModal: React.FC<SpeakerManagerModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
-        <div className="flex justify-between items-center p-6 border-b border-slate-700 bg-slate-800">
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <User className="text-blue-400" />
-            Speaker Manager
-          </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+        {/* Header */}
+        <div className="flex-none p-6 border-b border-slate-800 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
+              <User className="text-blue-400" size={20} />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">Speaker Manager</h2>
+              <p className="text-xs text-slate-400">Rename or remove identified speakers</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white">
             <X size={24} />
           </button>
         </div>
@@ -65,7 +71,7 @@ const SpeakerManagerModal: React.FC<SpeakerManagerModalProps> = ({
               const isEditing = editingId === id;
 
               return (
-                <div key={id} className="flex items-center justify-between bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 hover:border-slate-600 transition-colors">
+                <div key={id} className="flex items-center justify-between bg-slate-800/50 p-3 rounded-xl border border-slate-700/50 hover:border-slate-600 transition-colors">
                   <div className="flex items-center gap-3 flex-1">
                     <div className={`w-10 h-10 rounded-full ${colorClass} flex items-center justify-center text-white font-bold text-sm shadow-sm`}>
                       {getSpeakerInitials(name)}
@@ -76,7 +82,7 @@ const SpeakerManagerModal: React.FC<SpeakerManagerModalProps> = ({
                         type="text"
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
-                        className="bg-slate-800 border border-blue-500 rounded px-2 py-1 text-white text-sm focus:outline-none w-full"
+                        className="bg-slate-900 border border-blue-500 rounded px-2 py-1 text-white text-sm focus:outline-none w-full"
                         autoFocus
                         onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit()}
                       />
@@ -120,7 +126,7 @@ const SpeakerManagerModal: React.FC<SpeakerManagerModalProps> = ({
           )}
         </div>
 
-        <div className="p-4 border-t border-slate-700 bg-slate-800/50 text-center text-xs text-slate-500">
+        <div className="flex-none p-4 border-t border-slate-800 bg-slate-900/80 text-center text-xs text-slate-500">
           Speakers are automatically identified by the AI. Rename them here for clarity.
         </div>
       </div>

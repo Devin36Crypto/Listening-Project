@@ -1,4 +1,3 @@
-/// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -36,15 +35,6 @@ export default defineConfig({
   css: {
     postcss: {
       plugins: [tailwindcss, autoprefixer],
-    },
-  },
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: ['./vitest-setup.ts'],
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'json', 'html'],
     },
   },
   server: {
