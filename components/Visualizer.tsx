@@ -14,14 +14,6 @@ const Visualizer: React.FC<VisualizerProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
 
-  // Configure analyser for time-domain waveform
-  useEffect(() => {
-    if (analyserNode && isActive) {
-      // eslint-disable-next-line react-compiler/react-compiler
-      analyserNode.fftSize = 1024;
-    }
-  }, [analyserNode, isActive]);
-
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -47,7 +39,10 @@ const Visualizer: React.FC<VisualizerProps> = ({
       return;
     }
 
-    const bufferLength = 1024;
+    // fftSize must be set on the AnalyserNode — this is a required Web Audio API configuration.
+    // eslint-disable-next-line react-hooks/immutability
+    analyserNode.fftSize = 1024;
+    const bufferLength = 1024; // same value; avoids reading back the mutated prop
     const dataArray = new Uint8Array(bufferLength);
 
     const draw = () => {

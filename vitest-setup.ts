@@ -36,6 +36,24 @@ class AudioContextMock {
         connect: vi.fn(),
         disconnect: vi.fn(),
     });
+    createChannelMerger = vi.fn().mockReturnValue({
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+    });
+    createAnalyser = vi.fn().mockReturnValue({
+        fftSize: 1024,
+        smoothingTimeConstant: 0.75,
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+    });
+    createBufferSource = vi.fn().mockReturnValue({
+        buffer: null,
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+        start: vi.fn(),
+        stop: vi.fn(),
+        addEventListener: vi.fn(),
+    });
     createMediaStreamSource = vi.fn().mockReturnValue({
         connect: vi.fn(),
         disconnect: vi.fn(),
@@ -44,8 +62,8 @@ class AudioContextMock {
         addModule: vi.fn().mockResolvedValue(undefined),
     };
     createMediaElementSource = vi.fn().mockReturnValue({
-      connect: vi.fn(),
-      disconnect: vi.fn(),
+        connect: vi.fn(),
+        disconnect: vi.fn(),
     });
     destination = {};
 }
@@ -64,12 +82,22 @@ vi.stubGlobal('AudioWorkletNode', AudioWorkletNode);
 
 // Mock HTMLMediaElement.prototype.play
 vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
-vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => { });
+
+// Mock MediaStream
+class MediaStreamMock {
+    id = 'mock-stream';
+    active = true;
+    getTracks = vi.fn().mockReturnValue([]);
+    getAudioTracks = vi.fn().mockReturnValue([]);
+    getVideoTracks = vi.fn().mockReturnValue([]);
+}
+vi.stubGlobal('MediaStream', MediaStreamMock);
 
 // Mock navigator.mediaDevices
 Object.defineProperty(navigator, 'mediaDevices', {
     value: {
-        getUserMedia: vi.fn().mockResolvedValue(new MediaStream()),
+        getUserMedia: vi.fn().mockResolvedValue(new MediaStreamMock()),
         enumerateDevices: vi.fn().mockResolvedValue([
             { kind: 'audioinput', deviceId: 'default', label: 'Default Microphone' }
         ]),
@@ -89,10 +117,24 @@ Object.defineProperty(navigator, 'wakeLock', {
 
 // Mock navigator.mediaSession
 Object.defineProperty(navigator, 'mediaSession', {
-  value: {
-    metadata: null,
-    playbackState: 'none',
-    setActionHandler: vi.fn(),
-  },
-  writable: true
+    value: {
+        metadata: null,
+        playbackState: 'none',
+        setActionHandler: vi.fn(),
+    },
+    writable: true
 });
+
+// Mock MediaMetadata
+class MediaMetadataMock {
+    title = '';
+    artist = '';
+    album = '';
+    artwork = [];
+    constructor(init?: Partial<MediaMetadataMock>) {
+        if (init) {
+            Object.assign(this, init);
+        }
+    }
+}
+vi.stubGlobal('MediaMetadata', MediaMetadataMock);

@@ -1,5 +1,6 @@
+/// <reference types="vite/client" />
 import { GoogleGenAI } from '@google/genai';
-import { MODEL_TTS, MODEL_TRANSCRIBE, MODEL_FAST_TRANSLATE, MODEL_SEARCH } from '../constants';
+import { MODEL_TRANSCRIBE, MODEL_FAST_TRANSLATE, MODEL_SEARCH } from '../constants';
 const getApiKey = () => {
   const key = import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('gemini_api_key');
   if (!key) throw new Error('API_KEY_MISSING');

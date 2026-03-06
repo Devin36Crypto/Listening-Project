@@ -44,7 +44,7 @@ export function useAudioSession(
     const audioContextOutput = useRef<AudioContext | null>(null);
     const activeStreamsRef = useRef<MediaStream[]>([]);
     const workletNodeRef = useRef<AudioWorkletNode | null>(null);
-    const sessionPromiseRef = useRef<Promise<any> | null>(null);
+    const sessionPromiseRef = useRef<Promise<unknown> | null>(null);
     const nextStartTimeRef = useRef<number>(0);
     const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
     const wakeLockRef = useRef<WakeLockSentinel | null>(null);
@@ -105,17 +105,19 @@ export function useAudioSession(
         };
         document.addEventListener('visibilitychange', handle);
         return () => document.removeEventListener('visibilitychange', handle);
-    }, [isRecording]);
+    }, [isRecording, addLog]);
     const initializeMultiInputAudio = async (ctx: AudioContext): Promise<AudioWorkletNode> => {
         let devices: MediaDeviceInfo[] = [];
-        try { devices = await navigator.mediaDevices.enumerateDevices(); } catch { }
+        try { devices = await navigator.mediaDevices.enumerateDevices(); } catch (e) {
+            console.debug('Failed to enumerate devices:', e);
+        }
         const audioInputs = devices.filter(d => d.kind === 'audioinput');
         const specific = audioInputs.filter(d => d.deviceId !== 'default' && d.deviceId !== 'communications');
         const toTry = specific.length > 0 ? specific : audioInputs;
         const merger = ctx.createChannelMerger(1);
         const constraints = getAudioConstraints(settings.noiseCancellationLevel);
-        let streamCount = 0;
         addLog('system', `Scanning hardware... Found ${toTry.length} potential sensors.`);
+        let streamCount: number;
         const scanResults = await Promise.all(
             toTry.map(async device => {
                 try {
@@ -139,9 +141,9 @@ export function useAudioSession(
                 ctx.createMediaStreamSource(stream).connect(merger);
                 streamCount = 1;
                 addLog('system', 'Using primary sensor array.');
-            } catch (e: any) {
-                if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') throw new Error('PermissionDenied');
-                throw new Error('No audio sensors available.');
+            } catch (e: unknown) {
+                if (e instanceof Error && (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError')) throw new Error('PermissionDenied', { cause: e });
+                throw new Error('No audio sensors available.', { cause: e });
             }
         } else {
             addLog('system', `Audio Fusion Active: ${streamCount} sensors online.`);
@@ -155,11 +157,11 @@ export function useAudioSession(
         // Load and initialize AudioWorklet (prevent redundant loads)
         try {
             await ctx.audioWorklet.addModule(audioProcessorUrl);
-        } catch (e: any) {
+        } catch (e: unknown) {
             // Ignore if already added, but log other failures
-            if (!e.message?.includes('already registered')) {
+            if (e instanceof Error && !e.message?.includes('already registered')) {
                 console.error('Failed to load AudioWorklet module:', e, audioProcessorUrl);
-                throw new Error('AudioWorklet module failed to load. Check storage/paths.');
+                throw new Error('AudioWorklet module failed to load. Check storage/paths.', { cause: e });
             }
         }
         const workletNode = new AudioWorkletNode(ctx, 'audio-processor');
@@ -210,7 +212,7 @@ export function useAudioSession(
             await requestWakeLock();
             enableBackgroundMode();
 
-            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+            const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
             audioContextInput.current = new AudioContextClass({ sampleRate: INPUT_SAMPLE_RATE });
             audioContextOutput.current = new AudioContextClass({ sampleRate: OUTPUT_SAMPLE_RATE });
 
@@ -252,7 +254,8 @@ CORE PROTOCOLS:
                         setIsRecording(true);
                         workletNode.port.onmessage = (e) => {
                             const base64 = createPcmBase64(e.data);
-                            sessionPromiseRef.current?.then(session => session.sendRealtimeInput({
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            sessionPromiseRef.current?.then((session: any) => session.sendRealtimeInput({
                                 media: {
                                     mimeType: `audio/pcm;rate=${INPUT_SAMPLE_RATE}`,
                                     data: base64
@@ -300,13 +303,14 @@ CORE PROTOCOLS:
                 },
             });
             sessionPromiseRef.current = sessionPromise;
-        } catch (err: any) {
+        } catch (err: unknown) {
             let msg = 'Critical Failure: Audio Sensors Unreachable.';
-            if (err.message === 'PermissionDenied' || err.name === 'NotAllowedError') msg = 'Microphone access denied. Enable permissions in browser settings.';
-            else if (err.message === 'No audio sensors available.') msg = 'No microphone found. Please connect an audio device.';
-            else if (err.message === 'API_KEY_MISSING') msg = 'API Configuration Error: VITE_GEMINI_API_KEY is missing from environment.';
-            else if (err.message?.includes('API_KEY')) msg = 'API Configuration Error: Invalid API Key.';
-            addLog('system', `${msg} [${err.message || 'Unknown Error'}]`, true);
+            const errorObj = err instanceof Error ? err : new Error(String(err));
+            if (errorObj.message === 'PermissionDenied' || errorObj.name === 'NotAllowedError') msg = 'Microphone access denied. Enable permissions in browser settings.';
+            else if (errorObj.message === 'No audio sensors available.') msg = 'No microphone found. Please connect an audio device.';
+            else if (errorObj.message === 'API_KEY_MISSING') msg = 'API Configuration Error: VITE_GEMINI_API_KEY is missing from environment.';
+            else if (errorObj.message?.includes('API_KEY')) msg = 'API Configuration Error: Invalid API Key.';
+            addLog('system', `${msg} [${errorObj.message || 'Unknown Error'}]`, true);
             releaseWakeLock();
             disableBackgroundMode();
             setIsRecording(false);
@@ -338,8 +342,8 @@ CORE PROTOCOLS:
             addLog('system', 'Initializing Offline Mode...');
             await requestWakeLock();
             enableBackgroundMode();
-            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-            audioContextInput.current = new AudioContextClass({ sampleRate: 16000 });
+            const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+            audioContextInput.current = new AudioContextClass({ sampleRate: INPUT_SAMPLE_RATE });
             await audioContextInput.current.resume();
             const workletNode = await initializeMultiInputAudio(audioContextInput.current);
             workletNodeRef.current = workletNode;
@@ -349,7 +353,7 @@ CORE PROTOCOLS:
             };
             setIsRecording(true);
             addLog('system', 'Offline Recording Started. Speak now.');
-        } catch (err) {
+        } catch {
             addLog('system', 'Failed to start offline recording.', true);
             setIsRecording(false);
         }

@@ -6,36 +6,37 @@ import { getSessions, deleteSession } from '../services/db';
 interface HistoryModalProps {
     isOpen: boolean;
     onClose: () => void;
+    vaultKey: string | null;
     onSelectSession: (session: Session) => void;
 }
 
-const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, onSelectSession }) => {
+const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, vaultKey, onSelectSession }) => {
     const [sessions, setSessions] = useState<Session[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const loadSessions = async () => {
+    const fetchSessions = React.useCallback(async () => {
         setLoading(true);
         try {
-            const data = await getSessions();
+            const data = await getSessions(vaultKey);
             setSessions(data);
         } catch (err) {
             console.error("Failed to load sessions", err);
         } finally {
             setLoading(false);
         }
-    };
+    }, [vaultKey]);
 
     useEffect(() => {
         if (isOpen) {
-            loadSessions();
+            fetchSessions();
         }
-    }, [isOpen]);
+    }, [isOpen, fetchSessions]);
 
     const handleDelete = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
         if (confirm('Are you sure you want to delete this session?')) {
             await deleteSession(id);
-            await loadSessions();
+            await fetchSessions();
         }
     };
 

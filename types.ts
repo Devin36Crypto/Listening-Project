@@ -31,3 +31,20 @@ export interface Session {
   logs: LogMessage[];
   speakerRegistry: Record<string, string>;
 }
+
+export interface PeerNode {
+  id: string;
+  name: string;
+  position: { x: number; y: number };
+  lastSeen: number;
+}
+
+export interface BeforeInstallPromptEvent extends Event {
+  readonly platforms: string[];
+  readonly userChoice: Promise<{
+    outcome: 'accepted' | 'dismissed';
+    platform: string;
+  }>;
+  prompt(): Promise<void>;
+}
+

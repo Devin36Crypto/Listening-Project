@@ -6,9 +6,14 @@ type WorkerStatus = {
     message?: string;
 };
 
+type WorkerResult = {
+    task: string;
+    output: { text: string };
+};
+
 export function useOfflineWorker() {
     const [status, setStatus] = useState<WorkerStatus>({ status: 'idle' });
-    const [result, setResult] = useState<any>(null);
+    const [result, setResult] = useState<WorkerResult | null>(null);
     const workerRef = useRef<Worker | null>(null);
 
     useEffect(() => {

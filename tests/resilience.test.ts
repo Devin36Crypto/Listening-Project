@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useAudioSession } from '../hooks/useAudioSession';
 
@@ -16,7 +16,7 @@ vi.mock('@google/genai', () => {
 });
 
 describe('Network Resilience', () => {
-    let addLog: any;
+    let addLog: Mock;
 
     beforeEach(() => {
         addLog = vi.fn();
@@ -28,7 +28,7 @@ describe('Network Resilience', () => {
         await act(async () => {
             try {
                 await result.current.startSession();
-            } catch (e) {
+            } catch {
                 // Expected to fail due to mock
             }
         });

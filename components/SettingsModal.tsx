@@ -13,17 +13,21 @@ interface SettingsModalProps {
   onImport: (file: File) => void;
   onClearData: () => void;
   storageUsage: number;
+  canInstall: boolean;
+  onInstall: () => void;
 }
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  settings, 
-  onUpdate, 
-  onExport, 
-  onImport, 
-  onClearData, 
-  storageUsage 
+const SettingsModal: React.FC<SettingsModalProps> = ({
+  isOpen,
+  onClose,
+  settings,
+  onUpdate,
+  onExport,
+  onImport,
+  onClearData,
+  storageUsage,
+  canInstall,
+  onInstall
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -106,8 +110,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   key={level}
                   onClick={() => onUpdate({ ...settings, noiseCancellationLevel: level })}
                   className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${settings.noiseCancellationLevel === level
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
                     }`}
                 >
                   {level.charAt(0).toUpperCase() + level.slice(1)}
@@ -174,7 +178,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 {formatBytes(storageUsage)} used
               </span>
             </h3>
-            
+
             <div className="grid grid-cols-2 gap-3 mb-3">
               <button
                 onClick={onExport}
@@ -183,7 +187,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 <Download size={18} />
                 <span>Export</span>
               </button>
-              
+
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 py-3 rounded-xl transition-colors border border-slate-700"
@@ -191,12 +195,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 <Upload size={18} />
                 <span>Import</span>
               </button>
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleFileChange} 
-                accept=".json" 
-                className="hidden" 
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept=".json"
+                className="hidden"
               />
             </div>
 
@@ -207,11 +211,23 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               <Trash2 size={18} />
               <span>Clear All Local Data</span>
             </button>
-            
+
             <p className="text-xs text-slate-500 mt-3 text-center">
               Your data is stored locally on this device. Exporting allows you to backup or transfer your history.
             </p>
           </div>
+
+          {/* Install App */}
+          {canInstall && (
+            <div className="pt-4 border-t border-slate-800">
+              <button
+                onClick={onInstall}
+                className="w-full flex items-center justify-center gap-2 bg-blue-900/20 hover:bg-blue-900/40 text-blue-400 font-semibold py-3 rounded-xl transition-colors border border-blue-900/30"
+              >
+                <span>Install App</span>
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="flex-none p-6 border-t border-slate-800 bg-slate-900/80 sticky bottom-0">

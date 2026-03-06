@@ -23,14 +23,14 @@ export async function decodeAudioData(
 ): Promise<AudioBuffer> {
   try {
     return await ctx.decodeAudioData(data.buffer as ArrayBuffer);
-  } catch (e) {
+  } catch {
     const floatData = new Float32Array(data.length / 2);
     const view = new DataView(data.buffer as ArrayBuffer);
-    
+
     for (let i = 0; i < floatData.length; i++) {
       floatData[i] = view.getInt16(i * 2, true) / 0x7FFF;
     }
-    
+
     const buffer = ctx.createBuffer(1, floatData.length, sampleRate);
     buffer.getChannelData(0).set(floatData);
     return buffer;
