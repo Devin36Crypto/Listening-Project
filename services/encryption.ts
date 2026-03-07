@@ -6,7 +6,7 @@
 const ENC_ALGO = 'AES-GCM';
 const KDF_ALGO = 'PBKDF2';
 const HASH_ALGO = 'SHA-256';
-const ITERATIONS = 100000;
+const ITERATIONS = 210_000; // OWASP 2024 recommendation for PBKDF2-HMAC-SHA256 with AES-256
 const SALT_SIZE = 16;
 const IV_SIZE = 12;
 
@@ -23,7 +23,7 @@ export async function deriveKey(passphrase: string, salt: Uint8Array): Promise<C
     return crypto.subtle.deriveKey(
         {
             name: KDF_ALGO,
-            salt,
+            salt: salt as BufferSource,
             iterations: ITERATIONS,
             hash: HASH_ALGO
         },
@@ -38,7 +38,7 @@ export async function encryptData(text: string, passphrase: string): Promise<Uin
     const salt = crypto.getRandomValues(new Uint8Array(SALT_SIZE));
     const iv = crypto.getRandomValues(new Uint8Array(IV_SIZE));
     const key = await deriveKey(passphrase, salt);
-    
+
     const encoder = new TextEncoder();
     const ciphertext = await crypto.subtle.encrypt(
         { name: ENC_ALGO, iv },
@@ -70,13 +70,19 @@ export async function decryptData(combined: Uint8Array, passphrase: string): Pro
         );
         return new TextDecoder().decode(decrypted);
     } catch (e) {
-        throw new Error('DECRYPTION_FAILED');
+        throw new Error('DECRYPTION_FAILED', { cause: e });
     }
 }
 
 // Helpers for Base64 storage
 export function arrayBufferToBase64(buffer: Uint8Array): string {
-    return btoa(String.fromCharCode(...buffer));
+    // NOTE: Do NOT use String.fromCharCode(...buffer) — spread on large arrays causes
+    // "Maximum call stack size exceeded" for encrypted payloads >65,535 bytes.
+    let binary = '';
+    for (let i = 0; i < buffer.length; i++) {
+        binary += String.fromCharCode(buffer[i]);
+    }
+    return btoa(binary);
 }
 
 export function base64ToArrayBuffer(base64: string): Uint8Array {

@@ -14,14 +14,6 @@ const Visualizer: React.FC<VisualizerProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
 
-  // Configure analyser for time-domain waveform
-  useEffect(() => {
-    if (analyserNode && isActive) {
-      // eslint-disable-next-line react-compiler/react-compiler
-      analyserNode.fftSize = 1024;
-    }
-  }, [analyserNode, isActive]);
-
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -47,42 +39,18 @@ const Visualizer: React.FC<VisualizerProps> = ({
       return;
     }
 
-    const bufferLength = 1024;
+    // fftSize must be set on the AnalyserNode — this is a required Web Audio API configuration.
+    // eslint-disable-next-line react-hooks/immutability
+    analyserNode.fftSize = 1024;
+    const bufferLength = 1024; // same value; avoids reading back the mutated prop
     const dataArray = new Uint8Array(bufferLength);
 
-    let lastDrawTime = 0;
-    const fpsLimit = 20; // Drastically reduce FPS to save battery
-    const frameInterval = 1000 / fpsLimit;
-
-    const draw = (timestamp: number) => {
+    const draw = () => {
       animationRef.current = requestAnimationFrame(draw);
-
-      // Throttling: Skip frames to save CPU/GPU energy
-      if (timestamp - lastDrawTime < frameInterval) return;
-      lastDrawTime = timestamp;
-
-      // Battery Saver: Don't draw if the page is hidden or inactive
-      if (document.visibilityState === 'hidden' || !isActive) {
-        return;
-      }
 
       analyserNode.getByteTimeDomainData(dataArray);
 
       ctx.clearRect(0, 0, WIDTH, HEIGHT);
-
-      // Only draw if there's significant audio to show
-      let hasSignal = false;
-      for (let i = 0; i < bufferLength; i += 4) { // Sample to save loop time
-        if (Math.abs(dataArray[i] - 128) > 1) {
-          hasSignal = true;
-          break;
-        }
-      }
-
-      if (!hasSignal) {
-        drawFlatLine();
-        return;
-      }
 
       // Glow effect
       ctx.shadowBlur = 8;
@@ -98,6 +66,7 @@ const Visualizer: React.FC<VisualizerProps> = ({
       let x = 0;
 
       for (let i = 0; i < bufferLength; i++) {
+        // dataArray[i] is 0-255; 128 = silence (center)
         const v = dataArray[i] / 128.0;
         const y = (v * HEIGHT) / 2;
 
@@ -114,7 +83,7 @@ const Visualizer: React.FC<VisualizerProps> = ({
       ctx.shadowBlur = 0;
     };
 
-    draw(performance.now());
+    draw();
 
     return () => {
       cancelAnimationFrame(animationRef.current);

@@ -36,6 +36,24 @@ class AudioContextMock {
         connect: vi.fn(),
         disconnect: vi.fn(),
     });
+    createChannelMerger = vi.fn().mockReturnValue({
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+    });
+    createAnalyser = vi.fn().mockReturnValue({
+        fftSize: 1024,
+        smoothingTimeConstant: 0.75,
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+    });
+    createBufferSource = vi.fn().mockReturnValue({
+        buffer: null,
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+        start: vi.fn(),
+        stop: vi.fn(),
+        addEventListener: vi.fn(),
+    });
     createMediaStreamSource = vi.fn().mockReturnValue({
         connect: vi.fn(),
         disconnect: vi.fn(),
@@ -66,25 +84,15 @@ vi.stubGlobal('AudioWorkletNode', AudioWorkletNode);
 vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
 vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => { });
 
-// Mock MediaStream and MediaStreamTrack
-class MediaStreamTrackMock {
-    enabled = true;
-    kind = 'audio';
-    stop = vi.fn();
-}
-
+// Mock MediaStream
 class MediaStreamMock {
-    id = crypto.randomUUID();
+    id = 'mock-stream';
     active = true;
-    getTracks = vi.fn().mockReturnValue([new MediaStreamTrackMock()]);
-    getAudioTracks = vi.fn().mockReturnValue([new MediaStreamTrackMock()]);
+    getTracks = vi.fn().mockReturnValue([]);
+    getAudioTracks = vi.fn().mockReturnValue([]);
     getVideoTracks = vi.fn().mockReturnValue([]);
-    addTrack = vi.fn();
-    removeTrack = vi.fn();
 }
-
 vi.stubGlobal('MediaStream', MediaStreamMock);
-vi.stubGlobal('MediaStreamTrack', MediaStreamTrackMock);
 
 // Mock navigator.mediaDevices
 Object.defineProperty(navigator, 'mediaDevices', {
@@ -117,13 +125,16 @@ Object.defineProperty(navigator, 'mediaSession', {
     writable: true
 });
 
-class MediaMetadata {
+// Mock MediaMetadata
+class MediaMetadataMock {
     title = '';
     artist = '';
     album = '';
     artwork = [];
-    constructor(init: any) {
-        Object.assign(this, init);
+    constructor(init?: Partial<MediaMetadataMock>) {
+        if (init) {
+            Object.assign(this, init);
+        }
     }
 }
-vi.stubGlobal('MediaMetadata', MediaMetadata);
+vi.stubGlobal('MediaMetadata', MediaMetadataMock);

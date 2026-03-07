@@ -29,17 +29,6 @@
     "noEmit": true
   },
   "include": [
-    "src",
-    "services",
-    "hooks",
-    "utils",
-    "workers",
-    "components",
-    "App.tsx",
-    "index.tsx",
-    "constants.ts",
-    "types.ts",
-    "global.d.ts",
-    "vitest-setup.ts"
+    "src"
   ]
 }

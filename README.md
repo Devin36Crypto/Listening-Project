@@ -22,12 +22,6 @@ A real-time AI-powered translation and transcription application built with Reac
 - **Audio Handling**: Web Audio API (AudioWorklet, AnalyserNode)
 - **Persistence**: IndexedDB
 
-## Run Application
-
-Click the link below to open the application in your browser (ensure the dev server is running):
-
-👉 **[Run ListeningProject](http://localhost:3000)**
-
 ## Getting Started
 
 1. Clone the repository.

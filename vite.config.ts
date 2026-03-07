@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import tailwindcss from 'tailwindcss';
 import autoprefixer from 'autoprefixer';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
 
 export default defineConfig({
   plugins: [
@@ -30,7 +31,15 @@ export default defineConfig({
           }
         ]
       }
-    })
+    }),
+    // Uploads source maps to Sentry on production builds (requires SENTRY_AUTH_TOKEN)
+    sentryVitePlugin({
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      // Silently skip if auth token is not set (e.g. during local dev builds)
+      silent: true,
+    }),
   ],
   css: {
     postcss: {
@@ -39,8 +48,17 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    proxy: {
+      '/supabase-api': {
+        target: 'https://uydybhioyjdmncvixsoc.supabase.co',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/supabase-api/, '')
+      }
+    }
   },
   build: {
+    // Required for Sentry to map minified stack traces back to source
+    sourcemap: true,
     rollupOptions: {
       output: {
         manualChunks: {
@@ -50,4 +68,14 @@ export default defineConfig({
       },
     },
   },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./vitest-setup.ts'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+    },
+  },
 });
+

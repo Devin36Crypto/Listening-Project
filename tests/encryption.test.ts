@@ -32,4 +32,20 @@ describe('Encryption Service', () => {
         const back = base64ToArrayBuffer(b64);
         expect(back).toEqual(data);
     });
+
+    it('should handle arrayBufferToBase64 on large buffers without stack overflow', async () => {
+        // Regression guard: the old spread-based implementation throws
+        // "Maximum call stack size exceeded" for payloads > ~65,535 bytes.
+        // Encrypted sessions are typically 50-500KB, so this must work reliably.
+        const largeData = new Uint8Array(200_000).fill(0xAB);
+        // Should NOT throw
+        const b64 = arrayBufferToBase64(largeData);
+        expect(typeof b64).toBe('string');
+        expect(b64.length).toBeGreaterThan(0);
+        // Full encrypt/decrypt round-trip on large payload
+        const largeText = 'A'.repeat(100_000);
+        const encrypted = await encryptData(largeText, passphrase);
+        const decrypted = await decryptData(encrypted, passphrase);
+        expect(decrypted).toBe(largeText);
+    });
 });

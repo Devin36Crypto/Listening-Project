@@ -13,8 +13,8 @@ interface SettingsModalProps {
   onImport: (file: File) => void;
   onClearData: () => void;
   storageUsage: number;
-  canInstall?: boolean;
-  onInstall?: () => void;
+  canInstall: boolean;
+  onInstall: () => void;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -83,20 +83,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         <div className="p-6 space-y-8 flex-1">
-          {/* PWA Install */}
-          {canInstall && (
-            <button
-              onClick={onInstall}
-              className="w-full flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-xl transition-all shadow-lg shadow-blue-900/40 mb-2 border border-blue-400/30 group"
-            >
-              <Download size={20} className="group-active:translate-y-1 transition-transform" />
-              <div className="flex flex-col items-start translate-y-[-1px]">
-                <span className="text-sm font-bold leading-tight">Install ListeningProject</span>
-                <span className="text-[10px] opacity-80">Better background & battery performance</span>
-              </div>
-            </button>
-          )}
-
           {/* Target Language */}
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-slate-300">
@@ -230,6 +216,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               Your data is stored locally on this device. Exporting allows you to backup or transfer your history.
             </p>
           </div>
+
+          {/* Install App */}
+          {canInstall && (
+            <div className="pt-4 border-t border-slate-800">
+              <button
+                onClick={onInstall}
+                className="w-full flex items-center justify-center gap-2 bg-blue-900/20 hover:bg-blue-900/40 text-blue-400 font-semibold py-3 rounded-xl transition-colors border border-blue-900/30"
+              >
+                <span>Install App</span>
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="flex-none p-6 border-t border-slate-800 bg-slate-900/80 sticky bottom-0">

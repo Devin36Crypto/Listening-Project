@@ -56,8 +56,8 @@ const OfflineWarningModal: React.FC<OfflineWarningModalProps> = ({
                                     <p className="text-xs text-slate-500">Speech recognition (transcription)</p>
                                 </div>
                                 <div className="flex items-center gap-1.5">
-                                    <Download size={14} className="text-blue-400" />
-                                    <span className="text-sm text-blue-400 font-mono">~75 MB</span>
+                                    <Download size={14} className="text-slate-400" />
+                                    <span className="text-sm text-slate-400 font-mono">~75 MB</span>
                                 </div>
                             </div>
                             <div className="flex justify-between items-center p-3 bg-slate-900/60 rounded-lg border border-slate-700">
@@ -66,8 +66,8 @@ const OfflineWarningModal: React.FC<OfflineWarningModalProps> = ({
                                     <p className="text-xs text-slate-500">Offline translation (optional)</p>
                                 </div>
                                 <div className="flex items-center gap-1.5">
-                                    <Download size={14} className="text-blue-400" />
-                                    <span className="text-sm text-blue-400 font-mono">~1.2 GB</span>
+                                    <Download size={14} className="text-slate-400" />
+                                    <span className="text-sm text-slate-400 font-mono">~1.2 GB</span>
                                 </div>
                             </div>
                         </div>

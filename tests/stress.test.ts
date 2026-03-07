@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { saveSession, getSessions, clearAllSessions } from '../services/db';
 import { Session, AppMode } from '../types';
 
@@ -10,6 +10,7 @@ describe('Marathon Stress Test', () => {
     it('should handle 1,000 log entries without corruption', async () => {
         const logs = Array.from({ length: 1000 }, (_, i) => ({
             id: `log-${i}`,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             role: i % 2 === 0 ? 'user' : 'model' as any,
             text: `Stress test message ${i} - simulating a long duration marathon session to verify persistence robustness.`,
             timestamp: new Date(),
@@ -40,12 +41,15 @@ describe('Marathon Stress Test', () => {
     it('should verify debounce efficiency (logic level simulation)', async () => {
         // This test simulates the logic used in App.tsx debounce
         const savedVersions: string[] = [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const mockSave = async (s: any) => {
             savedVersions.push(JSON.stringify(s.logs));
             return Promise.resolve();
         };
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let currentLogs: any[] = [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const triggerUpdate = (newLog: any) => {
             currentLogs = [...currentLogs, newLog];
             // Simulate the useEffect debounce logic

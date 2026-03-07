@@ -5,8 +5,13 @@ const DB_NAME = 'listening-project-db';
 const STORE_NAME = 'sessions';
 const DB_VERSION = 2;
 
+// Singleton: cache the DB promise so we open exactly one connection for the app's lifetime.
+// Re-opening on every operation wastes resources and can cause race conditions.
+let _dbPromise: Promise<IDBDatabase> | null = null;
+
 export const openDB = (): Promise<IDBDatabase> => {
-    return new Promise((resolve, reject) => {
+    if (_dbPromise) return _dbPromise;
+    _dbPromise = new Promise((resolve, reject) => {
         const request = indexedDB.open(DB_NAME, DB_VERSION);
 
         request.onupgradeneeded = (event) => {
@@ -19,22 +24,27 @@ export const openDB = (): Promise<IDBDatabase> => {
         };
 
         request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
+        request.onerror = () => {
+            _dbPromise = null; // Reset on failure so next call can retry
+            reject(request.error);
+        };
     });
+    return _dbPromise;
 };
 
 export const saveSession = async (session: Session, vaultKey?: string | null): Promise<void> => {
     const db = await openDB();
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
-    
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let dataToStore: any = session;
 
     if (vaultKey) {
         // Zero-Knowledge Encryption
         const json = JSON.stringify(session);
         const encrypted = await encryptData(json, vaultKey);
-        
+
         dataToStore = {
             id: session.id,
             encryptedData: arrayBufferToBase64(encrypted),
@@ -44,7 +54,7 @@ export const saveSession = async (session: Session, vaultKey?: string | null): P
     }
 
     store.put(dataToStore);
-    
+
     return new Promise((resolve, reject) => {
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
@@ -59,6 +69,7 @@ export const getSessions = async (vaultKey?: string | null): Promise<Session[]> 
 
     return new Promise((resolve, reject) => {
         request.onsuccess = async () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const rawResult = request.result as any[];
             const processedSessions: Session[] = [];
 
@@ -69,14 +80,14 @@ export const getSessions = async (vaultKey?: string | null): Promise<Session[]> 
                             const bytes = base64ToArrayBuffer(item.encryptedData);
                             const decryptedStr = await decryptData(bytes, vaultKey);
                             const session = JSON.parse(decryptedStr);
-                            
-                            // Re-hydrate dates
+
                             session.startTime = new Date(session.startTime);
                             if (session.endTime) session.endTime = new Date(session.endTime);
                             if (session.logs) {
-                              session.logs.forEach((log: any) => {
-                                if (log.timestamp) log.timestamp = new Date(log.timestamp);
-                              });
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                session.logs.forEach((log: any) => {
+                                    if (log.timestamp) log.timestamp = new Date(log.timestamp);
+                                });
                             }
                             processedSessions.push(session);
                         } catch (e) {
@@ -113,7 +124,7 @@ export const deleteSession = async (id: string): Promise<void> => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
     store.delete(id);
-    
+
     return new Promise((resolve, reject) => {
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
@@ -133,31 +144,32 @@ export const clearAllSessions = async (): Promise<void> => {
 };
 
 export const importSessions = async (sessions: Session[], vaultKey?: string | null): Promise<void> => {
-  const db = await openDB();
-  const tx = db.transaction(STORE_NAME, 'readwrite');
-  const store = tx.objectStore(STORE_NAME);
-  
-  for (const session of sessions) {
-    let dataToStore: any = session;
-    if (vaultKey) {
-      const encrypted = await encryptData(JSON.stringify(session), vaultKey);
-      dataToStore = {
-        id: session.id,
-        encryptedData: arrayBufferToBase64(encrypted),
-        isEncrypted: true,
-        startTime: new Date(session.startTime)
-      };
-    }
-    store.put(dataToStore);
-  }
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
 
-  return new Promise((resolve, reject) => {
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
+    for (const session of sessions) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let dataToStore: any = session;
+        if (vaultKey) {
+            const encrypted = await encryptData(JSON.stringify(session), vaultKey);
+            dataToStore = {
+                id: session.id,
+                encryptedData: arrayBufferToBase64(encrypted),
+                isEncrypted: true,
+                startTime: new Date(session.startTime)
+            };
+        }
+        store.put(dataToStore);
+    }
+
+    return new Promise((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
 };
 
-export const getStorageUsage = async (vaultKey?: string | null): Promise<number> => {
+export const getStorageUsage = async (_vaultKey?: string | null): Promise<number> => {
     const db = await openDB();
     const tx = db.transaction(STORE_NAME, 'readonly');
     const store = tx.objectStore(STORE_NAME);
@@ -169,5 +181,23 @@ export const getStorageUsage = async (vaultKey?: string | null): Promise<number>
             resolve(new Blob([data]).size);
         };
         request.onerror = () => resolve(0);
+    });
+};
+
+export const getRawEncryptedSessions = async (): Promise<{ id: string, encryptedData: string, isEncrypted: boolean, startTime: Date }[]> => {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.getAll();
+
+    return new Promise((resolve, reject) => {
+        request.onsuccess = () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const rawResult = request.result as any[];
+            // Only export the sessions that are already safely encrypted
+            const encryptedOnly = rawResult.filter(r => r.isEncrypted);
+            resolve(encryptedOnly);
+        };
+        request.onerror = () => reject(request.error);
     });
 };

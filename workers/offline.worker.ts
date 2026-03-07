@@ -5,35 +5,43 @@ env.allowLocalModels = false;
 env.useBrowserCache = true;
 
 class OfflineProcessor {
-  static task_instances: Record<string, any> = {};
+  static task_instances: Record<string, unknown> = {};
 
-  static async getInstance(task: string, model: string, progress_callback?: (data: any) => void) {
+  static async getInstance(task: string, model: string, progress_callback?: (data: { file: string, progress: number }) => void) {
     const key = `${task}-${model}`;
     if (!this.task_instances[key]) {
-      this.task_instances[key] = pipeline(task as any, model, { progress_callback });
+      // @ts-expect-error pipeline signature varies
+      this.task_instances[key] = await pipeline(task, model, { progress_callback });
     }
     return this.task_instances[key];
   }
 }
 
+// Shared progress reporter — posts loading status back to the main thread
+const makeProgressCallback = () => (progress: { file: string; progress: number }) => {
+  self.postMessage({
+    type: 'status',
+    status: 'loading',
+    message: `Loading model: ${progress.file}`,
+    progress: progress.progress,
+  });
+};
+
 self.addEventListener('message', async (event) => {
-  const { type, data } = event.data;
+  const { task, ...data } = event.data;
 
   try {
-    if (type === 'transcribe') {
+    if (task === 'transcribe') {
       const { audio, language } = data;
-
-      const progress_callback = (progress: any) => {
-        self.postMessage({ status: 'loading', task: 'transcribe', progress: progress.progress, file: progress.file });
-      };
 
       const transcriber = await OfflineProcessor.getInstance(
         'automatic-speech-recognition',
         'Xenova/whisper-tiny',
-        progress_callback
+        makeProgressCallback()
       );
 
-      const output = await transcriber(audio, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const output = await (transcriber as any)(audio, {
         chunk_length_s: 30,
         stride_length_s: 5,
         language: language || 'english',
@@ -41,29 +49,39 @@ self.addEventListener('message', async (event) => {
         return_timestamps: true,
       });
 
-      self.postMessage({ status: 'complete', task: 'transcribe', output });
+      self.postMessage({
+        type: 'result',
+        status: 'ready',
+        result: { task: 'transcribe', output }
+      });
 
-    } else if (type === 'translate') {
-      const { text, source_lang, target_lang } = data;
-
-      const progress_callback = (progress: any) => {
-        self.postMessage({ status: 'loading', task: 'translate', progress: progress.progress, file: progress.file });
-      };
+    } else if (task === 'translate') {
+      const { text, source, target } = data;
 
       const translator = await OfflineProcessor.getInstance(
         'translation',
         'Xenova/nLLB-200-distilled-600M',
-        progress_callback
+        makeProgressCallback()
       );
 
-      const output = await translator(text, {
-        src_lang: source_lang,
-        tgt_lang: target_lang,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const output = await (translator as any)(text, {
+        src_lang: source,
+        tgt_lang: target,
       });
 
-      self.postMessage({ status: 'complete', task: 'translate', output });
+      self.postMessage({
+        type: 'result',
+        status: 'ready',
+        result: { task: 'translate', output }
+      });
     }
-  } catch (error: any) {
-    self.postMessage({ status: 'error', error: error.message });
+  } catch (error: unknown) {
+    self.postMessage({
+      type: 'status',
+      status: 'error',
+      message: error instanceof Error ? error.message : String(error)
+    });
   }
 });
+

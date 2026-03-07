@@ -1,17 +1,12 @@
 export const APP_NAME = 'ListeningProject';
 export const APP_VERSION = '2.1.0';
-
-// Model IDs
-export const MODEL_LIVE = 'gemini-2.0-flash-exp';
-export const MODEL_TTS = 'gemini-1.5-flash';
-export const MODEL_TRANSCRIBE = 'gemini-1.5-flash';
-export const MODEL_FAST_TRANSLATE = 'gemini-1.5-flash';
-export const MODEL_SEARCH = 'gemini-1.5-pro';
-
-// Audio Settings
+export const MODEL_LIVE = 'gemini-2.5-flash-native-audio-preview-09-2025';
+export const MODEL_TTS = 'gemini-2.5-flash-preview-tts';
+export const MODEL_TRANSCRIBE = 'gemini-3-flash-preview';
+export const MODEL_FAST_TRANSLATE = 'gemini-3-flash-preview';
+export const MODEL_SEARCH = 'gemini-3.1-pro-preview';
 export const INPUT_SAMPLE_RATE = 16000;
 export const OUTPUT_SAMPLE_RATE = 24000;
-
 export const LANGUAGES = [
   { code: 'en-US', label: 'English (US)' },
   { code: 'en-GB', label: 'English (UK)' },
@@ -67,7 +62,6 @@ export const LANGUAGES = [
   { code: 'sq-AL', label: 'Albanian' },
   { code: 'hu-HU', label: 'Hungarian' },
 ];
-
 export const VOICES = [
   { id: 'Puck', label: 'Puck (Energetic)' },
   { id: 'Charon', label: 'Charon (Deep)' },
@@ -75,7 +69,6 @@ export const VOICES = [
   { id: 'Fenrir', label: 'Fenrir (Balanced)' },
   { id: 'Aoede', label: 'Aoede (Musical)' },
 ];
-
 export const NOISE_LEVELS = [
   { id: 'off', label: 'Off' },
   { id: 'low', label: 'Low (Indoor)' },

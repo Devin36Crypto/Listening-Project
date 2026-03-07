@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Lock, Unlock } from 'lucide-react';
 
 interface PocketModeOverlayProps {
@@ -82,10 +82,7 @@ const PocketModeOverlay: React.FC<PocketModeOverlayProps> = ({ isActive, onUnloc
         <div className="flex flex-col items-center gap-4 opacity-50">
           <Lock size={48} className="text-slate-500" />
           <div className="text-center space-y-2">
-            <h2 className="text-2xl font-bold tracking-wider text-slate-300">
-              <span className="sm:hidden">POCKET MODE</span>
-              <span className="hidden sm:block">LOCKED SCREEN</span>
-            </h2>
+            <h2 className="text-2xl font-bold tracking-wider text-slate-300">POCKET MODE</h2>
             <p className="text-sm font-light text-slate-500">
               {statusText || "App is active & listening"}
             </p>

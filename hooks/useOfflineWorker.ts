@@ -8,7 +8,7 @@ type WorkerStatus = {
 
 export function useOfflineWorker() {
     const [status, setStatus] = useState<WorkerStatus>({ status: 'idle' });
-    const [result, setResult] = useState<any>(null);
+    const [result, setResult] = useState<unknown>(null);
     const workerRef = useRef<Worker | null>(null);
 
     useEffect(() => {
@@ -19,7 +19,7 @@ export function useOfflineWorker() {
 
         worker.onmessage = (e) => {
             const { type, status: s, progress, message, result: r } = e.data;
-            
+
             if (type === 'status') {
                 setStatus({ status: s, progress, message });
             } else if (type === 'result') {

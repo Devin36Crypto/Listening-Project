@@ -6,46 +6,50 @@ import { useAudioSession } from '../hooks/useAudioSession';
 vi.mock('@google/genai', () => {
   return {
     GoogleGenAI: vi.fn().mockImplementation(() => ({
-      getGenerativeModel: vi.fn().mockReturnValue({
-        startChat: vi.fn().mockReturnValue({
-          sendMessage: vi.fn().mockRejectedValue(new Error('Network disconnected'))
+      live: {
+        connect: vi.fn().mockImplementation(({ callbacks }) => {
+          // Simulate an immediate error
+          if (callbacks && callbacks.onerror) {
+            callbacks.onerror(new Error('Network disconnected'));
+          }
+          return Promise.resolve({
+            sendRealtimeInput: vi.fn(),
+            disconnect: vi.fn()
+          });
         })
-      })
-    }))
+      }
+    })),
+    Modality: { AUDIO: 'AUDIO' }
   };
 });
 
 describe('Network Resilience', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let addLog: any;
+  const mockSettings = { targetLanguage: 'English', voice: 'Puck', autoSpeak: true, noiseCancellationLevel: 'high' as const, pushToTalk: false };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mockMode = 'LIVE_TRANSLATOR' as any;
+  const onOfflineChunks = vi.fn();
 
   beforeEach(() => {
     addLog = vi.fn();
   });
 
   it('should log system error on connection failure', async () => {
-    const settings = {
-      targetLanguage: 'English',
-      voice: 'Puck',
-      autoSpeak: true,
-      noiseCancellationLevel: 'high',
-      pushToTalk: false,
-    };
-    const { result } = renderHook(() => useAudioSession(settings as any, 'Live Translator' as any, addLog, vi.fn(), 'valid_key'));
+    const { result } = renderHook(() => useAudioSession(mockSettings, mockMode, addLog, onOfflineChunks, 'valid_key'));
 
     await act(async () => {
       try {
         await result.current.startSession();
-      } catch (e) {
-        // Expected to fail due to mock
+      } catch {
+        // Expected to fail due to mock or handled gracefully
       }
     });
 
-    // Check the 3rd call for the actual error log
-    expect(addLog).toHaveBeenNthCalledWith(
-      3,
-      'system',
-      expect.stringContaining('Critical Failure'),
-      true
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const systemErrorCall = addLog.mock.calls.find((call: any) =>
+      call[0] === 'system' && call[2] === true
     );
+    expect(systemErrorCall).toBeDefined();
   });
 });

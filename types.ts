@@ -1,3 +1,12 @@
+export interface BeforeInstallPromptEvent extends Event {
+  readonly platforms: string[];
+  readonly userChoice: Promise<{
+    outcome: 'accepted' | 'dismissed';
+    platform: string;
+  }>;
+  prompt(): Promise<void>;
+}
+
 export enum AppMode {
   LIVE_TRANSLATOR = 'LIVE_TRANSLATOR',
   TRANSCRIBER = 'TRANSCRIBER',
@@ -5,10 +14,8 @@ export enum AppMode {
   OFFLINE_MODE = 'OFFLINE_MODE',
   LOCKED = 'LOCKED'
 }
-
 export type NoiseLevel = 'off' | 'low' | 'high';
 export type VoiceName = 'Puck' | 'Charon' | 'Kore' | 'Fenrir' | 'Aoede';
-
 export interface Settings {
   targetLanguage: string;
   voice: string;
@@ -16,7 +23,6 @@ export interface Settings {
   noiseCancellationLevel: NoiseLevel;
   pushToTalk: boolean;
 }
-
 export interface LogMessage {
   id: string;
   role: 'user' | 'model' | 'system' | 'date-marker';
@@ -24,6 +30,22 @@ export interface LogMessage {
   timestamp: Date;
   isError?: boolean;
   speakerId?: string;
+}
+export interface DeviceInfo {
+  type: 'phone' | 'watch' | 'earbuds' | 'tablet' | 'laptop' | 'standard';
+  model?: string;
+  isHost?: boolean;
+}
+
+export interface PeerNode {
+  id: string;
+  name: string;
+  device: DeviceInfo;
+  status: 'online' | 'offline' | 'connecting' | 'connected' | 'latent';
+  lastSeen: Date;
+  distance?: number;
+  role: 'primary' | 'secondary' | 'ambient';
+  confidence?: number;
 }
 
 export interface Session {
@@ -34,10 +56,4 @@ export interface Session {
   targetLanguage: string;
   logs: LogMessage[];
   speakerRegistry: Record<string, string>;
-}
-
-export interface Speaker {
-  id: string;
-  name: string;
-  color: string;
 }
