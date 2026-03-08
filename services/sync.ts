@@ -23,9 +23,11 @@ export const backupToCloud = async (): Promise<number> => {
 
     // Upsert the encrypted payloads to Supabase
     // Requires the session_backups table to exist in Supabase with session_id as a constraint
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const upsertOptions = { onConflict: 'session_id, user_id' } as any;
     const { error } = await supabase
         .from('session_backups')
-        .upsert(payload, { onConflict: 'session_id, user_id' } as any);
+        .upsert(payload, upsertOptions);
 
     if (error) throw error;
 

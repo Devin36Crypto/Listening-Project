@@ -29,6 +29,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   canInstall,
   onInstall
 }) => {
+  const [isDragging, setIsDragging] = React.useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
@@ -37,6 +38,26 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     const file = event.target.files?.[0];
     if (file) {
       onImport(file);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.name.endsWith('.json')) {
+      onImport(file);
+    } else {
+      alert('Please drop at .json backup file.');
     }
   };
 
@@ -60,12 +81,21 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 transition-all ${isDragging ? 'bg-blue-600/20' : ''}`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="settings-modal-title"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl overflow-y-auto max-h-[90vh] flex flex-col">
+      <div className={`bg-slate-900 border ${isDragging ? 'border-blue-500 shadow-[0_0_40px_rgba(37,99,235,0.3)]' : 'border-slate-700'} rounded-2xl w-full max-w-md shadow-2xl overflow-y-auto max-h-[90vh] flex flex-col transition-all relative`}>
+        {isDragging && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-blue-600/10 backdrop-blur-[2px] pointer-events-none border-2 border-dashed border-blue-500 rounded-2xl animate-pulse">
+            <Upload size={48} className="text-blue-400 mb-2" />
+            <p className="text-blue-400 font-bold text-lg">Drop to Import Backup</p>
+          </div>
+        )}
         {/* Header */}
         <div className="flex-none p-6 border-b border-slate-800 flex justify-between items-center sticky top-0 bg-slate-900 z-10">
           <div className="flex items-center gap-3">

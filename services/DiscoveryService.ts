@@ -4,14 +4,6 @@ class DiscoveryService {
     private peers: Map<string, PeerNode> = new Map();
     private onNodesChanged: (nodes: PeerNode[]) => void = () => { };
 
-    constructor() {
-        this.setupListeners();
-    }
-
-    private setupListeners() {
-        // Future implementation for WebRTC and Bluetooth listeners
-    }
-
     public setUpdateListener(callback: (nodes: PeerNode[]) => void) {
         this.onNodesChanged = callback;
     }
@@ -46,22 +38,6 @@ class DiscoveryService {
                 this.onNodesChanged(Array.from(this.peers.values()));
             }, 2000);
         }
-    }
-
-    /**
-     * Broadcasts presence to nearby devices.
-     */
-    public async advertisePresence() {
-        if ('bluetooth' in navigator) {
-            // Logic for Web Bluetooth advertising
-        }
-    }
-
-    /**
-     * Triggers an ultrasonic sync pulse.
-     */
-    public async triggerAcousticSync() {
-        // Audio context pulse generation logic
     }
 
     public getActiveNodes(): PeerNode[] {

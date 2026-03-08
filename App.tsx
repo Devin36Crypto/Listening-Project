@@ -1,4 +1,14 @@
 /// <reference types="vite/client" />
+
+declare global {
+  interface Window {
+    aistudio?: {
+      openSelectKey?: () => Promise<void>;
+      hasSelectedApiKey?: () => Promise<boolean>;
+    };
+  }
+}
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Key } from 'lucide-react';
 import AppHeader from './components/AppHeader';
@@ -14,6 +24,7 @@ import { useAudioSession } from './hooks/useAudioSession';
 import { saveSession, importSessions, clearAllSessions, getStorageUsage } from './services/db';
 import { getSpeakerColor, getSpeakerInitials } from './utils/colors';
 import { discoveryService } from './services/DiscoveryService';
+import { initSubscriptions, getDetailedSubscriptionStatus } from './services/subscriptions';
 
 const App: React.FC = () => {
   // --- UI State ---
@@ -44,10 +55,47 @@ const App: React.FC = () => {
 
   // --- Peer Discovery State ---
   const [nodes, setNodes] = useState<PeerNode[]>([]);
+
   useEffect(() => {
-    discoveryService.setUpdateListener(setNodes);
-    discoveryService.advertisePresence();
+    // 1. Peer Discovery (Throttled for performance)
+    let lastUpdate = 0;
+    discoveryService.setUpdateListener((newNodes) => {
+      const now = Date.now();
+      if (now - lastUpdate > 500) {
+        setNodes(newNodes);
+        lastUpdate = now;
+      }
+    });
+
+    // 2. Auth & Subscriptions Initialization
+    const initBackend = async () => {
+      try {
+        await initSubscriptions();
+        const sub = await getDetailedSubscriptionStatus();
+        if (sub.hasExpired && !sub.isPro) {
+          setActiveMode(AppMode.LOCKED);
+        }
+      } catch (err) {
+        console.error("Failed to initialize RevenueCat:", err);
+      }
+    };
+    initBackend();
   }, []);
+
+  // Unlock when Pro status changes
+  useEffect(() => {
+    if (activeMode === AppMode.LOCKED) {
+      const checkUnlock = async () => {
+        const sub = await getDetailedSubscriptionStatus();
+        if (sub.isPro) {
+          setActiveMode(AppMode.LIVE_TRANSLATOR);
+        }
+      };
+      // Check every 5 seconds while locked (or we could use a listener)
+      const interval = setInterval(checkUnlock, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [activeMode]);
 
   const handleScanPeers = useCallback(() => {
     setShowSpatialMap(true);
@@ -76,7 +124,7 @@ const App: React.FC = () => {
   // --- Update storage usage when settings open ---
   useEffect(() => {
     if (showSettings) {
-      getStorageUsage(vaultKey).then(setStorageUsage);
+      getStorageUsage().then(setStorageUsage);
     }
   }, [showSettings, vaultKey]);
 
@@ -102,10 +150,10 @@ const App: React.FC = () => {
     if (window.confirm('Are you sure you want to delete ALL local history? This cannot be undone.')) {
       await clearAllSessions();
       setLogs([]); // Clear current view too
-      getStorageUsage(vaultKey).then(setStorageUsage);
+      getStorageUsage().then(setStorageUsage);
       alert('All local data cleared.');
     }
-  }, [vaultKey]);
+  }, []);
 
   // --- Speaker Management State ---
   const [speakerRegistry, setSpeakerRegistry] = useState<Record<string, string>>({});
@@ -251,6 +299,7 @@ const App: React.FC = () => {
   // --- Offline Result Handling ---
   useEffect(() => {
     if (offlineResult) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { task, output } = offlineResult as { task: string; output: any };
       if (task === 'transcribe') {
         // eslint-disable-next-line react-hooks/set-state-in-effect

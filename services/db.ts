@@ -169,7 +169,7 @@ export const importSessions = async (sessions: Session[], vaultKey?: string | nu
     });
 };
 
-export const getStorageUsage = async (_vaultKey?: string | null): Promise<number> => {
+export const getStorageUsage = async (): Promise<number> => {
     const db = await openDB();
     const tx = db.transaction(STORE_NAME, 'readonly');
     const store = tx.objectStore(STORE_NAME);

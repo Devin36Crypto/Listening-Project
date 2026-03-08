@@ -38,7 +38,7 @@ export function useOfflineWorker() {
                 task: 'transcribe',
                 audio,
                 language
-            });
+            }, [audio.buffer]);
         }
     }, []);
 

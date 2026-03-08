@@ -76,13 +76,13 @@ export async function decryptData(combined: Uint8Array, passphrase: string): Pro
 
 // Helpers for Base64 storage
 export function arrayBufferToBase64(buffer: Uint8Array): string {
-    // NOTE: Do NOT use String.fromCharCode(...buffer) — spread on large arrays causes
-    // "Maximum call stack size exceeded" for encrypted payloads >65,535 bytes.
-    let binary = '';
-    for (let i = 0; i < buffer.length; i++) {
-        binary += String.fromCharCode(buffer[i]);
+    // Build in 8KB chunks to avoid O(n²) concatenation on large payloads
+    const CHUNK = 0x2000;
+    const parts: string[] = [];
+    for (let i = 0; i < buffer.length; i += CHUNK) {
+        parts.push(String.fromCharCode(...buffer.subarray(i, i + CHUNK)));
     }
-    return btoa(binary);
+    return btoa(parts.join(''));
 }
 
 export function base64ToArrayBuffer(base64: string): Uint8Array {
