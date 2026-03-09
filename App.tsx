@@ -10,7 +10,7 @@ declare global {
 }
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Key } from 'lucide-react';
+import { Key, Wifi } from 'lucide-react';
 import AppHeader from './components/AppHeader';
 import ChatList from './components/ChatList';
 import ControlPanel from './components/ControlPanel';
@@ -465,6 +465,17 @@ const App: React.FC = () => {
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
       />
+
+      {/* Floating Scan for Peers Button */}
+      {activeMode !== AppMode.LOCKED && (
+        <button
+          onClick={handleScanPeers}
+          className={`fixed bottom-8 left-8 p-4 rounded-2xl transition-all z-20 shadow-2xl glass-panel border border-white/10 ${nodes.some(n => n.status === 'online' || n.status === 'connected') ? 'bg-blue-600/20 text-blue-400 border-blue-500/30' : 'hover:bg-white/5 text-slate-400 hover:text-white'}`}
+          title="Scan for Peers"
+        >
+          <Wifi size={24} className={nodes.some(n => n.status === 'online' || n.status === 'connected') ? 'animate-pulse' : ''} />
+        </button>
+      )}
     </div>
   );
 };

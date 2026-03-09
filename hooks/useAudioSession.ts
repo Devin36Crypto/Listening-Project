@@ -84,7 +84,7 @@ export function useAudioSession(
                 title: 'ListeningProject Active',
                 artist: activeMode === AppMode.OFFLINE_MODE ? 'Offline Mode' : 'Live Translator',
                 album: 'Background Listening',
-                artwork: [{ src: '/icon.svg', sizes: '96x96', type: 'image/svg+xml' }],
+                artwork: [{ src: '/icon.png', sizes: '512x512', type: 'image/png' }],
             });
             navigator.mediaSession.playbackState = 'playing';
             navigator.mediaSession.setActionHandler('play', () => { });

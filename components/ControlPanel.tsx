@@ -60,7 +60,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     }
 
     return (
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-premium-zinc via-premium-zinc to-transparent pt-20 pb-[max(1.5rem,env(safe-area-inset-bottom))] px-4 pointer-events-none lg:flex lg:justify-center">
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-premium-zinc via-premium-zinc to-transparent pt-12 pb-[max(1.5rem,env(safe-area-inset-bottom))] px-4 pointer-events-none lg:flex lg:justify-center">
             <div className="pointer-events-auto lg:w-full lg:max-w-3xl">
                 {/* Visualizer */}
                 <div className="mb-6 h-12">
@@ -138,7 +138,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                 onChange={(val) => setSettings(prev => ({ ...prev, targetLanguage: val }))}
                                 options={LANGUAGES.map(l => ({ value: l.code, label: l.label }))}
                                 position="up"
-                                className="w-14 h-14 rounded-2xl bg-white/5 border border-white/5 hover:border-white/10 transition-all flex items-center justify-center"
+                                className="w-12 h-12 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition-all flex items-center justify-center"
                                 placeholder=""
                                 icon={<Globe size={24} className="text-brand-400" />}
                             />
@@ -168,19 +168,19 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                             if (settings.pushToTalk && isRecording) toggleRecording();
                         }}
                         onClick={() => { if (!settings.pushToTalk) toggleRecording(); }}
-                        className={`relative w-24 h-24 md:w-28 md:h-28 rounded-full flex items-center justify-center transition-all ${isRecording
+                        className={`relative w-20 h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center transition-all ${isRecording
                             ? activeMode === AppMode.OFFLINE_MODE
-                                ? 'bg-accent-orange shadow-[0_0_40px_rgba(249,115,22,0.4)]'
-                                : 'bg-gradient-to-br from-brand-500 to-brand-700 shadow-[0_0_50px_rgba(59,130,246,0.4)]'
-                            : 'bg-white shadow-[0_0_30px_rgba(255,255,255,0.2)] text-premium-zinc'
+                                ? 'bg-accent-orange shadow-[0_0_30px_rgba(249,115,22,0.4)]'
+                                : 'bg-gradient-to-br from-brand-500 to-brand-700 shadow-[0_0_40px_rgba(59,130,246,0.4)]'
+                            : 'bg-white shadow-[0_0_20px_rgba(255,255,255,0.2)] text-premium-zinc'
                             }`}
                     >
                         {isRecording ? (
-                            <MicOff size={40} className="text-white relative z-10" />
+                            <MicOff size={32} className="text-white relative z-10" />
                         ) : (
                             activeMode === AppMode.OFFLINE_MODE
-                                ? <WifiOff size={40} className="text-premium-zinc relative z-10" />
-                                : <Mic size={40} className="text-premium-zinc relative z-10" />
+                                ? <WifiOff size={32} className="text-premium-zinc relative z-10" />
+                                : <Mic size={32} className="text-premium-zinc relative z-10" />
                         )}
                         {isRecording && (
                             <motion.div
@@ -199,7 +199,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     >
                         <button
                             onClick={() => setShowTranscript(!showTranscript)}
-                            className={`w-14 h-14 rounded-2xl flex items-center justify-center border transition-all ${showTranscript ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-transparent border-white/5 text-slate-600'}`}
+                            className={`w-12 h-12 rounded-xl flex items-center justify-center border transition-all ${showTranscript ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-transparent border-white/5 text-slate-600'}`}
                         >
                             {showTranscript
                                 ? <FileText size={24} className="text-brand-400" />
@@ -213,7 +213,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 <motion.p
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="text-center text-[10px] text-slate-500 mt-8 pb-2 font-bold uppercase tracking-[0.2em]"
+                    className="text-center text-[10px] text-slate-500 mt-4 pb-2 font-bold uppercase tracking-[0.2em]"
                 >
                     {isRecording
                         ? activeMode === AppMode.LIVE_TRANSLATOR

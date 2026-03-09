@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { Settings, VoiceName, NoiseLevel } from '../types';
 import { LANGUAGES, VOICES } from '../constants';
-import { X, Mic, Volume2, Globe, Download, Upload, Trash2, HardDrive, Settings as SettingsIcon } from 'lucide-react';
+import { X, Mic, Volume2, Download, Upload, Trash2, HardDrive, Settings as SettingsIcon } from 'lucide-react';
 import CustomSelect from './CustomSelect';
 
 interface SettingsModalProps {
@@ -69,10 +69,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const languageOptions = LANGUAGES.map(lang => ({
-    value: lang.code,
-    label: lang.label
-  }));
 
   const voiceOptions = VOICES.map(voice => ({
     value: voice.id,
@@ -113,21 +109,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         <div className="p-6 space-y-8 flex-1">
-          {/* Target Language */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-slate-300">
-              <Globe size={18} />
-              <label className="text-sm font-medium">Target Language</label>
-            </div>
-            <CustomSelect
-              value={settings.targetLanguage}
-              onChange={(value) => onUpdate({ ...settings, targetLanguage: value })}
-              options={languageOptions}
-              className="w-full bg-slate-950 border-slate-700 justify-between px-4 py-3 rounded-xl"
-              position="down"
-            />
-          </div>
-
           {/* Noise Cancellation */}
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-slate-300">
