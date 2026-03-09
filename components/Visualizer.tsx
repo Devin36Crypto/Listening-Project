@@ -14,6 +14,8 @@ const Visualizer: React.FC<VisualizerProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
 
+  const lastDrawTime = useRef<number>(0);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -48,9 +50,15 @@ const Visualizer: React.FC<VisualizerProps> = ({
     const draw = () => {
       animationRef.current = requestAnimationFrame(draw);
 
-      analyserNode.getByteTimeDomainData(dataArray);
+      // Cap at ~30fps to save battery on Android
+      const now = performance.now();
+      const elapsed = now - (lastDrawTime.current || 0);
+      if (elapsed < 33.3) return;
+      lastDrawTime.current = now;
 
+      analyserNode.getByteTimeDomainData(dataArray);
       ctx.clearRect(0, 0, WIDTH, HEIGHT);
+      // ... existing draw logic stays the same
 
       // Glow effect
       ctx.shadowBlur = 8;

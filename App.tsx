@@ -1,10 +1,21 @@
 /// <reference types="vite/client" />
+
+declare global {
+  interface Window {
+    aistudio?: {
+      openSelectKey?: () => Promise<void>;
+      hasSelectedApiKey?: () => Promise<boolean>;
+    };
+  }
+}
+
 import React, { useState, useEffect, useCallback } from 'react';
-import { Key } from 'lucide-react';
+import { Key, Wifi } from 'lucide-react';
 import AppHeader from './components/AppHeader';
 import ChatList from './components/ChatList';
 import ControlPanel from './components/ControlPanel';
 import ModalsLayer from './components/ModalsLayer';
+import AuthModal from './components/AuthModal';
 import PocketModeOverlay from './components/PocketModeOverlay';
 import SpatialMap from './components/SpatialMap';
 import { LogMessage, AppMode, Settings, PeerNode, BeforeInstallPromptEvent } from './types';
@@ -13,6 +24,7 @@ import { useAudioSession } from './hooks/useAudioSession';
 import { saveSession, importSessions, clearAllSessions, getStorageUsage } from './services/db';
 import { getSpeakerColor, getSpeakerInitials } from './utils/colors';
 import { discoveryService } from './services/DiscoveryService';
+import { initSubscriptions, getDetailedSubscriptionStatus } from './services/subscriptions';
 
 const App: React.FC = () => {
   // --- UI State ---
@@ -21,6 +33,7 @@ const App: React.FC = () => {
   const [showTranscript, setShowTranscript] = useState<boolean>(true);
   const [logs, setLogs] = useState<LogMessage[]>([]);
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [showOfflineWarning, setShowOfflineWarning] = useState<boolean>(false);
   const [showHistory, setShowHistory] = useState<boolean>(false);
   const [showSpeakerManager, setShowSpeakerManager] = useState<boolean>(false);
@@ -42,10 +55,47 @@ const App: React.FC = () => {
 
   // --- Peer Discovery State ---
   const [nodes, setNodes] = useState<PeerNode[]>([]);
+
   useEffect(() => {
-    discoveryService.setUpdateListener(setNodes);
-    discoveryService.advertisePresence();
+    // 1. Peer Discovery (Throttled for performance)
+    let lastUpdate = 0;
+    discoveryService.setUpdateListener((newNodes) => {
+      const now = Date.now();
+      if (now - lastUpdate > 500) {
+        setNodes(newNodes);
+        lastUpdate = now;
+      }
+    });
+
+    // 2. Auth & Subscriptions Initialization
+    const initBackend = async () => {
+      try {
+        await initSubscriptions();
+        const sub = await getDetailedSubscriptionStatus();
+        if (sub.hasExpired && !sub.isPro) {
+          setActiveMode(AppMode.LOCKED);
+        }
+      } catch (err) {
+        console.error("Failed to initialize RevenueCat:", err);
+      }
+    };
+    initBackend();
   }, []);
+
+  // Unlock when Pro status changes
+  useEffect(() => {
+    if (activeMode === AppMode.LOCKED) {
+      const checkUnlock = async () => {
+        const sub = await getDetailedSubscriptionStatus();
+        if (sub.isPro) {
+          setActiveMode(AppMode.LIVE_TRANSLATOR);
+        }
+      };
+      // Check every 5 seconds while locked (or we could use a listener)
+      const interval = setInterval(checkUnlock, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [activeMode]);
 
   const handleScanPeers = useCallback(() => {
     setShowSpatialMap(true);
@@ -74,7 +124,7 @@ const App: React.FC = () => {
   // --- Update storage usage when settings open ---
   useEffect(() => {
     if (showSettings) {
-      getStorageUsage(vaultKey).then(setStorageUsage);
+      getStorageUsage().then(setStorageUsage);
     }
   }, [showSettings, vaultKey]);
 
@@ -100,10 +150,10 @@ const App: React.FC = () => {
     if (window.confirm('Are you sure you want to delete ALL local history? This cannot be undone.')) {
       await clearAllSessions();
       setLogs([]); // Clear current view too
-      getStorageUsage(vaultKey).then(setStorageUsage);
+      getStorageUsage().then(setStorageUsage);
       alert('All local data cleared.');
     }
-  }, [vaultKey]);
+  }, []);
 
   // --- Speaker Management State ---
   const [speakerRegistry, setSpeakerRegistry] = useState<Record<string, string>>({});
@@ -248,9 +298,13 @@ const App: React.FC = () => {
 
   // --- Offline Result Handling ---
   useEffect(() => {
-    if (offlineResult?.task === 'transcribe') {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      addLog('model', `[Offline]: ${offlineResult.output.text}`);
+    if (offlineResult) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { task, output } = offlineResult as { task: string; output: any };
+      if (task === 'transcribe') {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        addLog('model', `[Offline]: ${output.text}`);
+      }
     }
   }, [offlineResult, addLog]);
 
@@ -342,6 +396,7 @@ const App: React.FC = () => {
         setShowHistory={setShowHistory}
         setShowVaultModal={setShowVaultModal}
         setShowSettings={setShowSettings}
+        setShowAuthModal={setShowAuthModal}
         vaultKey={vaultKey}
         nodes={nodes}
         onScan={handleScanPeers}
@@ -405,6 +460,22 @@ const App: React.FC = () => {
         setShowVaultModal={setShowVaultModal}
         setVaultKey={setVaultKey}
       />
+
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+      />
+
+      {/* Floating Scan for Peers Button */}
+      {activeMode !== AppMode.LOCKED && (
+        <button
+          onClick={handleScanPeers}
+          className={`fixed bottom-8 left-8 p-4 rounded-2xl transition-all z-20 shadow-2xl glass-panel border border-white/10 ${nodes.some(n => n.status === 'online' || n.status === 'connected') ? 'bg-blue-600/20 text-blue-400 border-blue-500/30' : 'hover:bg-white/5 text-slate-400 hover:text-white'}`}
+          title="Scan for Peers"
+        >
+          <Wifi size={24} className={nodes.some(n => n.status === 'online' || n.status === 'connected') ? 'animate-pulse' : ''} />
+        </button>
+      )}
     </div>
   );
 };

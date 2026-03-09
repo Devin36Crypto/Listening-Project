@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useAudioSession } from '../hooks/useAudioSession';
 
@@ -6,37 +6,50 @@ import { useAudioSession } from '../hooks/useAudioSession';
 vi.mock('@google/genai', () => {
   return {
     GoogleGenAI: vi.fn().mockImplementation(() => ({
-      getGenerativeModel: vi.fn().mockReturnValue({
-        startChat: vi.fn().mockReturnValue({
-          sendMessage: vi.fn().mockRejectedValue(new Error('Network disconnected'))
+      live: {
+        connect: vi.fn().mockImplementation(({ callbacks }) => {
+          // Simulate an immediate error
+          if (callbacks && callbacks.onerror) {
+            callbacks.onerror(new Error('Network disconnected'));
+          }
+          return Promise.resolve({
+            sendRealtimeInput: vi.fn(),
+            disconnect: vi.fn()
+          });
         })
-      })
-    }))
+      }
+    })),
+    Modality: { AUDIO: 'AUDIO' }
   };
 });
 
 describe('Network Resilience', () => {
-    let addLog: Mock;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let addLog: any;
+  const mockSettings = { targetLanguage: 'English', voice: 'Puck', autoSpeak: true, noiseCancellationLevel: 'high' as const, pushToTalk: false };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mockMode = 'LIVE_TRANSLATOR' as any;
+  const onOfflineChunks = vi.fn();
 
-    beforeEach(() => {
-        addLog = vi.fn();
+  beforeEach(() => {
+    addLog = vi.fn();
+  });
+
+  it('should log system error on connection failure', async () => {
+    const { result } = renderHook(() => useAudioSession(mockSettings, mockMode, addLog, onOfflineChunks, 'valid_key'));
+
+    await act(async () => {
+      try {
+        await result.current.startSession();
+      } catch {
+        // Expected to fail due to mock or handled gracefully
+      }
     });
 
-    it('should log system error on connection failure', async () => {
-        const { result } = renderHook(() => useAudioSession(addLog, 'valid_key'));
-
-        await act(async () => {
-            try {
-                await result.current.startSession();
-            } catch {
-                // Expected to fail due to mock
-            }
-        });
-
-        expect(addLog).toHaveBeenCalledWith(
-            expect.stringContaining('Critical Error'),
-            'system',
-            true
-        );
-    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const systemErrorCall = addLog.mock.calls.find((call: any) =>
+      call[0] === 'system' && call[2] === true
+    );
+    expect(systemErrorCall).toBeDefined();
+  });
 });

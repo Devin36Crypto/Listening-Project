@@ -1,3 +1,12 @@
+export interface BeforeInstallPromptEvent extends Event {
+  readonly platforms: string[];
+  readonly userChoice: Promise<{
+    outcome: 'accepted' | 'dismissed';
+    platform: string;
+  }>;
+  prompt(): Promise<void>;
+}
+
 export enum AppMode {
   LIVE_TRANSLATOR = 'LIVE_TRANSLATOR',
   TRANSCRIBER = 'TRANSCRIBER',
@@ -22,6 +31,23 @@ export interface LogMessage {
   isError?: boolean;
   speakerId?: string;
 }
+export interface DeviceInfo {
+  type: 'phone' | 'watch' | 'earbuds' | 'tablet' | 'laptop' | 'standard';
+  model?: string;
+  isHost?: boolean;
+}
+
+export interface PeerNode {
+  id: string;
+  name: string;
+  device: DeviceInfo;
+  status: 'online' | 'offline' | 'connecting' | 'connected' | 'latent';
+  lastSeen: Date;
+  distance?: number;
+  role: 'primary' | 'secondary' | 'ambient';
+  confidence?: number;
+}
+
 export interface Session {
   id: string;
   startTime: Date;

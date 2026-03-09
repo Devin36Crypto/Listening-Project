@@ -1,34 +1,61 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="./icon.svg" />
-    <link rel="apple-touch-icon" href="./icon.svg" />
-    <link rel="manifest" href="./manifest.json" />
-    <meta name="theme-color" content="#0f172a" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>ListeningProject</title>
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-      body {
-        font-family: 'Inter', sans-serif;
-        background-color: #0f172a;
-        color: #e2e8f0;
-        overflow: hidden; /* Prevent scrolling on body, handle in app */
-        touch-action: manipulation; /* Improve touch response */
-      }
-      /* Custom scrollbar for transcripts */
-      ::-webkit-scrollbar {
-        width: 6px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #1e293b;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #475569;
-        border-radius: 3px;
-      }
-    </style>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" href="./icon.png" />
+  <link rel="apple-touch-icon" href="./icon.png" />
+  <link rel="manifest" href="./manifest.json" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>ListeningProject | Real-time AI Translation & Transcription</title>
+  <meta name="description"
+    content="ListeningProject is a premium, real-time AI-powered translator and transcriber. Secure, fast, and accurate mobile and desktop audio processing." />
+  <meta name="keywords"
+    content="AI translator, transcription, real-time translation, ListeningProject, secure audio, PWA" />
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://listening-project.vercel.app/" />
+  <meta property="og:title" content="ListeningProject | Real-time AI Translation" />
+  <meta property="og:description"
+    content="Secure, fast, and accurate real-time AI-powered translation and transcription." />
+  <meta property="og:image" content="https://listening-project.vercel.app/icon.png" />
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image" />
+  <meta property="twitter:url" content="https://listening-project.vercel.app/" />
+  <meta property="twitter:title" content="ListeningProject | AI Translation" />
+  <meta property="twitter:description" content="Secure, fast, and accurate real-time AI-powered translation." />
+  <meta property="twitter:image" content="https://listening-project.vercel.app/icon.png" />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #0f172a;
+      color: #e2e8f0;
+      overflow: hidden;
+      /* Prevent scrolling on body, handle in app */
+      touch-action: manipulation;
+      /* Improve touch response */
+    }
+
+    /* Custom scrollbar for transcripts */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #1e293b;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 3px;
+    }
+  </style>
   <script type="importmap">
 {
   "imports": {
@@ -40,10 +67,12 @@
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
+  <link rel="stylesheet" href="/index.css">
 </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
 </body>
+
 </html>

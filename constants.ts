@@ -1,10 +1,6 @@
 export const APP_NAME = 'ListeningProject';
 export const APP_VERSION = '2.1.0';
 export const MODEL_LIVE = 'gemini-2.5-flash-native-audio-preview-09-2025';
-export const MODEL_TTS = 'gemini-2.5-flash-preview-tts';
-export const MODEL_TRANSCRIBE = 'gemini-3-flash-preview';
-export const MODEL_FAST_TRANSLATE = 'gemini-3-flash-preview';
-export const MODEL_SEARCH = 'gemini-3.1-pro-preview';
 export const INPUT_SAMPLE_RATE = 16000;
 export const OUTPUT_SAMPLE_RATE = 24000;
 export const LANGUAGES = [

@@ -169,7 +169,7 @@ export const importSessions = async (sessions: Session[], vaultKey?: string | nu
     });
 };
 
-export const getStorageUsage = async (_vaultKey?: string | null): Promise<number> => {
+export const getStorageUsage = async (): Promise<number> => {
     const db = await openDB();
     const tx = db.transaction(STORE_NAME, 'readonly');
     const store = tx.objectStore(STORE_NAME);
@@ -181,5 +181,23 @@ export const getStorageUsage = async (_vaultKey?: string | null): Promise<number
             resolve(new Blob([data]).size);
         };
         request.onerror = () => resolve(0);
+    });
+};
+
+export const getRawEncryptedSessions = async (): Promise<{ id: string, encryptedData: string, isEncrypted: boolean, startTime: Date }[]> => {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.getAll();
+
+    return new Promise((resolve, reject) => {
+        request.onsuccess = () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const rawResult = request.result as any[];
+            // Only export the sessions that are already safely encrypted
+            const encryptedOnly = rawResult.filter(r => r.isEncrypted);
+            resolve(encryptedOnly);
+        };
+        request.onerror = () => reject(request.error);
     });
 };

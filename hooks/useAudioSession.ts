@@ -84,7 +84,7 @@ export function useAudioSession(
                 title: 'ListeningProject Active',
                 artist: activeMode === AppMode.OFFLINE_MODE ? 'Offline Mode' : 'Live Translator',
                 album: 'Background Listening',
-                artwork: [{ src: '/icon.svg', sizes: '96x96', type: 'image/svg+xml' }],
+                artwork: [{ src: '/icon.png', sizes: '512x512', type: 'image/png' }],
             });
             navigator.mediaSession.playbackState = 'playing';
             navigator.mediaSession.setActionHandler('play', () => { });
@@ -113,11 +113,12 @@ export function useAudioSession(
         }
         const audioInputs = devices.filter(d => d.kind === 'audioinput');
         const specific = audioInputs.filter(d => d.deviceId !== 'default' && d.deviceId !== 'communications');
-        const toTry = specific.length > 0 ? specific : audioInputs;
+        const toTry = specific.slice(0, 4).length > 0 ? specific.slice(0, 4) : audioInputs.slice(0, 1);
         const merger = ctx.createChannelMerger(1);
         const constraints = getAudioConstraints(settings.noiseCancellationLevel);
-        addLog('system', `Scanning hardware... Found ${toTry.length} potential sensors.`);
-        let streamCount: number;
+        addLog('system', `Optimizing array... Using up to ${toTry.length} sensors.`);
+
+        let streamCount = 0;
         const scanResults = await Promise.all(
             toTry.map(async device => {
                 try {
