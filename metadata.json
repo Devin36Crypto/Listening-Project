@@ -1,6 +1,6 @@
 {
   "name": "ListeningProject",
-  "description": "A real-time AI listening, transcribing, and translating assistant using Gemini Live API.",
+  "description": "The core ListeningProject application for real-time AI listening, transcribing, and translating.",
   "requestFramePermissions": [
     "microphone"
   ]

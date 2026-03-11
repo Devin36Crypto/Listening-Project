@@ -70,3 +70,17 @@ export const NOISE_LEVELS = [
   { id: 'low', label: 'Low (Indoor)' },
   { id: 'high', label: 'High (Outdoor/Cafe)' },
 ];
+export const VIP_LIST = [
+  'Menard.Devin.dm@gamil.com', // Slot 1: User's Email
+  '', // Slot 2
+  '', // Slot 3
+  '', // Slot 4
+  '', // Slot 5
+  '', // Slot 6
+  '', // Slot 7
+  '', // Slot 8
+  '', // Slot 9
+  '', // Slot 10
+  '', // Slot 11
+  '', // Slot 12
+];

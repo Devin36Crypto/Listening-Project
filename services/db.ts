@@ -61,59 +61,76 @@ export const saveSession = async (session: Session, vaultKey?: string | null): P
     });
 };
 
-export const getSessions = async (vaultKey?: string | null): Promise<Session[]> => {
+export const getSessions = async (vaultKey?: string | null, limit = 50, offset = 0): Promise<Session[]> => {
     const db = await openDB();
     const tx = db.transaction(STORE_NAME, 'readonly');
     const store = tx.objectStore(STORE_NAME);
-    const request = store.getAll();
+    const index = store.index('startTime');
+
+    // Use a cursor for efficient pagination
+    const request = index.openCursor(null, 'prev'); // Most recent first
+    let advanced = false;
 
     return new Promise((resolve, reject) => {
+        const results: Session[] = [];
         request.onsuccess = async () => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const rawResult = request.result as any[];
-            const processedSessions: Session[] = [];
+            const cursor = request.result;
 
-            for (const item of rawResult) {
-                if (item.isEncrypted) {
-                    if (vaultKey) {
-                        try {
-                            const bytes = base64ToArrayBuffer(item.encryptedData);
-                            const decryptedStr = await decryptData(bytes, vaultKey);
-                            const session = JSON.parse(decryptedStr);
+            if (!cursor) {
+                resolve(results);
+                return;
+            }
 
-                            session.startTime = new Date(session.startTime);
-                            if (session.endTime) session.endTime = new Date(session.endTime);
-                            if (session.logs) {
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                session.logs.forEach((log: any) => {
+            if (offset > 0 && !advanced) {
+                advanced = true;
+                cursor.advance(offset);
+                return;
+            }
+
+            const item = cursor.value;
+            let processed: Session | null = null;
+
+            if (item.isEncrypted) {
+                if (vaultKey) {
+                    try {
+                        const bytes = base64ToArrayBuffer(item.encryptedData);
+                        const decryptedStr = await decryptData(bytes, vaultKey);
+                        processed = JSON.parse(decryptedStr);
+                        if (processed) {
+                            processed.startTime = new Date(processed.startTime);
+                            if (processed.endTime) processed.endTime = new Date(processed.endTime);
+                            if (processed.logs) {
+                                processed.logs.forEach((log: any) => {
                                     if (log.timestamp) log.timestamp = new Date(log.timestamp);
                                 });
                             }
-                            processedSessions.push(session);
-                        } catch (e) {
-                            console.error(`Failed to decrypt session ${item.id}`, e);
                         }
-                    } else {
-                        // Return a stub for locked sessions
-                        processedSessions.push({
-                            id: item.id,
-                            startTime: new Date(item.startTime),
-                            mode: AppMode.LOCKED,
-                            targetLanguage: 'LOCKED',
-                            logs: [],
-                            speakerRegistry: {}
-                        });
+                    } catch (e) {
+                        console.error(`Failed to decrypt session ${item.id}`, e);
                     }
                 } else {
-                    // Plaintext session
-                    if (typeof item.startTime === 'string') item.startTime = new Date(item.startTime);
-                    if (typeof item.endTime === 'string') item.endTime = new Date(item.endTime);
-                    processedSessions.push(item);
+                    processed = {
+                        id: item.id,
+                        startTime: new Date(item.startTime),
+                        mode: AppMode.LOCKED,
+                        targetLanguage: 'LOCKED',
+                        logs: [],
+                        speakerRegistry: {}
+                    };
                 }
+            } else {
+                processed = { ...item };
+                if (typeof processed?.startTime === 'string') processed.startTime = new Date(processed.startTime);
+                if (typeof processed?.endTime === 'string') processed.endTime = new Date(processed.endTime);
             }
 
-            // Sort by most recent
-            resolve(processedSessions.sort((a, b) => b.startTime.getTime() - a.startTime.getTime()));
+            if (processed) results.push(processed);
+
+            if (results.length < limit) {
+                cursor.continue();
+            } else {
+                resolve(results);
+            }
         };
         request.onerror = () => reject(request.error);
     });

@@ -1,3 +1,6 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -17,15 +20,23 @@ body {
 
 /* Premium Animations & Effects */
 .animate-ambient {
-  background: linear-gradient(-45deg, #020617, #0f172a, #1e1b4b, #020617);
+  background: linear-gradient(-45deg, #020617, #082f49, #0f172a, #020617);
   background-size: 400% 400%;
   animation: ambient-pulse 15s ease infinite;
 }
 
 @keyframes ambient-pulse {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
 .mic-glow {
@@ -44,9 +55,9 @@ body {
 }
 
 .glass-panel {
-  @apply bg-premium-zinc/40 backdrop-blur-2xl border border-white/10;
-  box-shadow: 
-    0 4px 6px -1px rgba(0, 0, 0, 0.1), 
+  @apply bg-[#09090b]/40 backdrop-blur-2xl border border-white/10;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
     0 2px 4px -1px rgba(0, 0, 0, 0.06),
     inset 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
@@ -64,4 +75,18 @@ body {
 
 .premium-card:hover::after {
   @apply opacity-100;
+}
+
+/* Custom scrollbar for transcripts */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 3px;
 }

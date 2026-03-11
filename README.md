@@ -1,4 +1,7 @@
-# ListeningProject
+# Listening Project - Core Application
+
+> [!NOTE]
+> This repository contains the **Core Application** (Mobile/Tablet/Desktop). It is separate from the [Landing Page & Website](file:///c:/Users/menar/.gemini/antigravity/scratch/listening-project-lp).
 
 A real-time AI-powered translation and transcription application built with React, Vite, and the Google Gemini API.
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mic, MicOff, WifiOff, Globe, FileText, FileX, Users, Clock, Shield, Settings as SettingsIcon, Smartphone, User } from 'lucide-react';
+import { Mic, MicOff, WifiOff, Globe, FileText, FileX } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Visualizer from './Visualizer';
 import CustomSelect from './CustomSelect';
@@ -60,33 +60,34 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     }
 
     return (
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-premium-zinc via-premium-zinc to-transparent pt-12 pb-[max(1.5rem,env(safe-area-inset-bottom))] px-4 pointer-events-none lg:flex lg:justify-center">
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-premium-zinc to-transparent pt-2 pb-[max(1.2rem,env(safe-area-inset-bottom))] px-4 pointer-events-none lg:flex lg:justify-center">
             <div className="pointer-events-auto lg:w-full lg:max-w-3xl">
                 {/* Visualizer */}
-                <div className="mb-6 h-12">
+                <div className="mb-4 h-10">
                     <Visualizer
                         analyserNode={analyserNode}
                         isActive={isRecording}
                         color={isRecording
-                            ? activeMode === AppMode.OFFLINE_MODE ? '#f97316' : '#3b82f6'
+                            ? activeMode === AppMode.OFFLINE_MODE ? '#f97316' : '#00e5ff'
                             : '#475569'
                         }
                     />
                 </div>
 
                 {/* Mode Selector */}
-                <div className="flex justify-center mb-8">
+                <div className="flex justify-center mb-4 w-full">
                     <div className="flex bg-premium-zinc/60 backdrop-blur-xl rounded-2xl p-1 border border-white/5 shadow-2xl">
                         {[
                             { mode: AppMode.LIVE_TRANSLATOR, label: 'Translator', color: 'bg-brand-500' },
-                            { mode: AppMode.TRANSCRIBER, label: 'Transcriber', color: 'bg-accent-purple' },
+                            { mode: AppMode.TRANSCRIBER, label: 'Transcriber', color: 'bg-brand-500' },
                             { mode: AppMode.CONTEXT_AWARE, label: 'AI Helper', color: 'bg-accent-emerald' }
                         ].map((m) => (
                             <button
                                 key={m.mode}
                                 onClick={() => setActiveMode(m.mode)}
-                                className={`relative px-4 py-2 rounded-xl text-[11px] font-bold transition-all ${activeMode === m.mode ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                                className={`relative w-24 px-2 py-2 rounded-xl text-[11px] font-bold transition-all ${activeMode === m.mode ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}
                             >
+
                                 {activeMode === m.mode && (
                                     <motion.div
                                         layoutId="active-mode"
@@ -125,90 +126,100 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 </AnimatePresence>
 
                 {/* Action Buttons */}
-                <div className="flex items-center justify-center gap-8 md:gap-12">
-                    {/* Language Selector */}
-                    {!isRecording && (
-                        <motion.div
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            className="flex flex-col items-center"
-                        >
-                            <CustomSelect
-                                value={settings.targetLanguage}
-                                onChange={(val) => setSettings(prev => ({ ...prev, targetLanguage: val }))}
-                                options={LANGUAGES.map(l => ({ value: l.code, label: l.label }))}
-                                position="up"
-                                className="w-12 h-12 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition-all flex items-center justify-center"
-                                placeholder=""
-                                icon={<Globe size={24} className="text-brand-400" />}
-                            />
-                            <span className="text-[10px] text-slate-500 mt-2 font-bold uppercase tracking-tighter">
-                                {settings.targetLanguage.slice(0, 10)}
-                            </span>
-                        </motion.div>
-                    )}
-
-                    {/* Mic Button */}
-                    <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onPointerDown={e => {
-                            if (settings.pushToTalk) {
-                                e.preventDefault();
-                                if (!isRecording) toggleRecording();
-                            }
-                        }}
-                        onPointerUp={e => {
-                            if (settings.pushToTalk) {
-                                e.preventDefault();
-                                if (isRecording) toggleRecording();
-                            }
-                        }}
-                        onPointerLeave={() => {
-                            if (settings.pushToTalk && isRecording) toggleRecording();
-                        }}
-                        onClick={() => { if (!settings.pushToTalk) toggleRecording(); }}
-                        className={`relative w-20 h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center transition-all ${isRecording
-                            ? activeMode === AppMode.OFFLINE_MODE
-                                ? 'bg-accent-orange shadow-[0_0_30px_rgba(249,115,22,0.4)]'
-                                : 'bg-gradient-to-br from-brand-500 to-brand-700 shadow-[0_0_40px_rgba(59,130,246,0.4)]'
-                            : 'bg-white shadow-[0_0_20px_rgba(255,255,255,0.2)] text-premium-zinc'
-                            }`}
-                    >
-                        {isRecording ? (
-                            <MicOff size={32} className="text-white relative z-10" />
-                        ) : (
-                            activeMode === AppMode.OFFLINE_MODE
-                                ? <WifiOff size={32} className="text-premium-zinc relative z-10" />
-                                : <Mic size={32} className="text-premium-zinc relative z-10" />
-                        )}
-                        {isRecording && (
+                <div className="grid grid-cols-3 items-center w-72 mx-auto">
+                    {/* Language Selector (Left Column) */}
+                    <div className="flex justify-center flex-col items-center">
+                        {!isRecording && (
                             <motion.div
-                                animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.4, 0.2] }}
-                                transition={{ duration: 1.5, repeat: Infinity }}
-                                className="absolute inset-0 rounded-full bg-white blur-xl"
-                            />
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                className="flex flex-col items-center"
+                            >
+                                <CustomSelect
+                                    value={settings.targetLanguage}
+                                    onChange={(val) => setSettings(prev => ({ ...prev, targetLanguage: val }))}
+                                    options={LANGUAGES.map(l => ({ value: l.code, label: l.label }))}
+                                    position="up"
+                                    className="w-12 h-12 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition-all flex items-center justify-center"
+                                    placeholder=""
+                                    icon={<Globe size={24} className="text-brand-400" />}
+                                />
+                                <span className="text-[10px] text-slate-500 mt-2 font-bold uppercase tracking-tighter">
+                                    {settings.targetLanguage.slice(0, 10)}
+                                </span>
+                            </motion.div>
                         )}
-                    </motion.button>
+                    </div>
 
-                    {/* Transcript Toggle */}
-                    <motion.div
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="relative flex flex-col items-center"
-                    >
-                        <button
-                            onClick={() => setShowTranscript(!showTranscript)}
-                            className={`w-12 h-12 rounded-xl flex items-center justify-center border transition-all ${showTranscript ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-transparent border-white/5 text-slate-600'}`}
+                    {/* Mic Button (Center Column) */}
+                    <div className="flex justify-center">
+                        <motion.button
+
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onPointerDown={e => {
+                                if (settings.pushToTalk) {
+                                    e.preventDefault();
+                                    if (!isRecording) toggleRecording();
+                                }
+                            }}
+                            onPointerUp={e => {
+                                if (settings.pushToTalk) {
+                                    e.preventDefault();
+                                    if (isRecording) toggleRecording();
+                                }
+                            }}
+                            onPointerLeave={() => {
+                                if (settings.pushToTalk && isRecording) toggleRecording();
+                            }}
+                            onClick={() => { if (!settings.pushToTalk) toggleRecording(); }}
+                            className={`relative w-14 h-14 md:w-18 md:h-18 rounded-full flex items-center justify-center transition-all ${isRecording
+                                ? activeMode === AppMode.OFFLINE_MODE
+                                    ? 'bg-accent-orange shadow-[0_0_20px_rgba(249,115,22,0.3)]'
+                                    : 'bg-gradient-to-br from-brand-500 to-brand-700 shadow-[0_0_30px_rgba(59,130,246,0.4)]'
+                                : 'bg-white shadow-[0_0_15px_rgba(255,255,255,0.2)] text-premium-zinc'
+                                }`}
                         >
-                            {showTranscript
-                                ? <FileText size={24} className="text-brand-400" />
-                                : <FileX size={24} />
-                            }
-                        </button>
-                        <span className="text-[10px] text-slate-500 mt-2 font-bold uppercase tracking-tighter">Transcript</span>
-                    </motion.div>
+                            {isRecording ? (
+                                <MicOff size={24} className="text-white relative z-10" />
+                            ) : (
+                                activeMode === AppMode.OFFLINE_MODE
+                                    ? <WifiOff size={24} className="text-black relative z-10" />
+                                    : <Mic size={24} className="text-black relative z-10" />
+                            )}
+
+
+                            {isRecording && (
+                                <motion.div
+                                    animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.4, 0.2] }}
+                                    transition={{ duration: 1.5, repeat: Infinity }}
+                                    className="absolute inset-0 rounded-full bg-white blur-xl"
+                                />
+                            )}
+                        </motion.button>
+                    </div>
+
+                    {/* Transcript Toggle (Right Column) */}
+                    <div className="flex justify-center flex-col items-center">
+                        <motion.div
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            className="relative flex flex-col items-center"
+                        >
+                            <button
+                                onClick={() => setShowTranscript(!showTranscript)}
+                                className={`w-12 h-12 rounded-xl flex items-center justify-center border transition-all ${showTranscript ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-transparent border-white/5 text-slate-600'}`}
+                            >
+                                {showTranscript
+                                    ? <FileText size={24} className="text-brand-400" />
+                                    : <FileX size={24} />
+                                }
+                            </button>
+                            <span className="text-[10px] text-slate-500 mt-2 font-bold uppercase tracking-tighter">Transcript</span>
+                        </motion.div>
+                    </div>
                 </div>
+
 
                 <motion.p
                     initial={{ opacity: 0 }}

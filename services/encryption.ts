@@ -6,9 +6,14 @@
 const ENC_ALGO = 'AES-GCM';
 const KDF_ALGO = 'PBKDF2';
 const HASH_ALGO = 'SHA-256';
-const ITERATIONS = 210_000; // OWASP 2024 recommendation for PBKDF2-HMAC-SHA256 with AES-256
+const ITERATIONS = 210_000;
 const SALT_SIZE = 16;
 const IV_SIZE = 12;
+
+// Early assertion of capability
+if (typeof crypto === 'undefined' || !crypto.subtle) {
+    throw new Error('SECURE_CONTEXT_REQUIRED: Web Crypto API is not available. Please ensure the app is running over HTTPS or on localhost.');
+}
 
 export async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
     const encoder = new TextEncoder();

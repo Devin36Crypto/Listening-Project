@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Mail, Lock, Loader2, AlertCircle, LogOut, User, CloudUpload, CloudDownload, Check, CreditCard, Sparkles, Clock } from 'lucide-react';
+import { X, Loader2, AlertCircle, LogOut, User, CloudUpload, CloudDownload, CreditCard, Sparkles, Clock } from 'lucide-react';
 import { getSupabase } from '../services/supabase';
 import { backupToCloud, restoreFromCloud } from '../services/sync';
 import { useSubscription } from '../hooks/useSubscription';
@@ -16,9 +16,9 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [syncLoading, setSyncLoading] = useState<'backup' | 'restore' | null>(null);
-    const [error, setError] = useState<string | null>(null);
     const [isSignUp, setIsSignUp] = useState(false);
-    const [message, setMessage] = useState<string | null>(null);
+    const [agreedToTerms, setAgreedToTerms] = useState(false);
+
 
     // Subscription logic
     const { details, loading: subLoading, purchase, offerings } = useSubscription();
@@ -56,75 +56,20 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
     const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!supabaseClient) {
-            setError('Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.');
-            return;
-        }
-
-        setLoading(true);
-        setError(null);
-        setMessage(null);
-
-        try {
-            if (isSignUp) {
-                const { error } = await supabaseClient.auth.signUp({
-                    email,
-                    password,
-                });
-                if (error) throw error;
-                setMessage('Check your email for the confirmation link!');
-            } else {
-                const { error } = await supabaseClient.auth.signInWithPassword({
-                    email,
-                    password,
-                });
-                if (error) throw error;
-                onClose(); // Close modal on successful login
-            }
-        } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : String(err));
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleSignOut = async () => {
         if (!supabaseClient) return;
+
         setLoading(true);
         try {
-            await supabaseClient.auth.signOut();
+            const { error } = isSignUp
+                ? await supabaseClient.auth.signUp({ email, password })
+                : await supabaseClient.auth.signInWithPassword({ email, password });
+
+            if (error) alert(error.message);
+            else if (!isSignUp) onClose();
         } catch (err) {
-            console.error('Error signing out:', err);
+            console.error("Auth failed:", err);
         } finally {
             setLoading(false);
-        }
-    };
-
-    const handleBackup = async () => {
-        setSyncLoading('backup');
-        setError(null);
-        setMessage(null);
-        try {
-            const count = await backupToCloud();
-            setMessage(`Successfully backed up ${count} encrypted sessions to the cloud.`);
-        } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : String(err));
-        } finally {
-            setSyncLoading(null);
-        }
-    };
-
-    const handleRestore = async () => {
-        setSyncLoading('restore');
-        setError(null);
-        setMessage(null);
-        try {
-            const count = await restoreFromCloud();
-            setMessage(count > 0 ? `Restored ${count} sessions to this device.` : 'No backups found in the cloud.');
-        } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : String(err));
-        } finally {
-            setSyncLoading(null);
         }
     };
 
@@ -145,6 +90,45 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     };
 
     if (!isOpen) return null;
+
+    const handleBackup = async () => {
+        setSyncLoading('backup');
+        try {
+            const count = await backupToCloud();
+            alert(`Successfully backed up ${count} sessions to the cloud.`);
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            alert(`Backup failed: ${msg}`);
+        } finally {
+            setSyncLoading(null);
+        }
+    };
+
+    const handleRestore = async () => {
+        setSyncLoading('restore');
+        try {
+            const count = await restoreFromCloud();
+            alert(`Successfully restored ${count} sessions from the cloud.`);
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            alert(`Restore failed: ${msg}`);
+        } finally {
+            setSyncLoading(null);
+        }
+    };
+
+    const handleSignOut = async () => {
+        if (!supabaseClient) return;
+        setLoading(true);
+        try {
+            await supabaseClient.auth.signOut();
+            onClose();
+        } catch (err) {
+            console.error("Sign out failed:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
@@ -200,7 +184,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                                         </div>
                                     </div>
                                     {details?.isTrial && (
-                                        <div className="bg-accent-purple/20 text-accent-purple text-[9px] font-black px-3 py-1.5 rounded-full border border-accent-purple/30 shadow-[0_0_15px_rgba(139,92,246,0.3)] uppercase tracking-tighter">
+                                        <div className="bg-brand-500/20 text-brand-400 text-[9px] font-black px-3 py-1.5 rounded-full border border-brand-500/30 shadow-[0_0_15px_rgba(0,229,255,0.3)] uppercase tracking-tighter">
                                             3-DAY TRIAL
                                         </div>
                                     )}
@@ -220,20 +204,34 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                                     <div className="h-px bg-white/5 my-2 shadow-inner" />
                                     <div className="flex justify-between items-center">
                                         <span className="text-xs text-slate-400 font-bold uppercase tracking-tighter">Total Monthly</span>
-                                        <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-brand-400 to-accent-purple font-mono">${details?.totalMonthlyCost || 0}.00</span>
+                                        <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-brand-400 to-brand-600 font-mono">${details?.totalMonthlyCost || 0}.00</span>
                                     </div>
                                 </div>
 
                                 {!details?.isPro && (
-                                    <button
-                                        onClick={handleSubscribe}
-                                        disabled={loading || subLoading}
-                                        className="w-full relative overflow-hidden flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-400 text-white py-4 rounded-2xl transition-all shadow-[0_10px_30px_rgba(59,130,246,0.4)] group active:scale-[0.98] disabled:opacity-50"
-                                    >
-                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-                                        {loading ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} className="animate-pulse" />}
-                                        <span className="font-black text-sm uppercase tracking-widest">Activate Pro</span>
-                                    </button>
+                                    <div className="space-y-4">
+                                        <div className="flex items-start gap-3 p-3 bg-white/5 rounded-xl border border-white/10">
+                                            <input
+                                                type="checkbox"
+                                                id="terms-agree"
+                                                checked={agreedToTerms}
+                                                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                                                className="mt-1 w-4 h-4 rounded border-white/20 bg-slate-900 text-brand-500 focus:ring-brand-500/50"
+                                            />
+                                            <label htmlFor="terms-agree" className="text-[10px] text-slate-400 leading-relaxed">
+                                                I have read and agree to the <a href="/TERMS.md" target="_blank" className="text-brand-400 hover:underline">Terms of Service</a> and <a href="/PRIVACY.md" target="_blank" className="text-brand-400 hover:underline">Privacy Policy</a>.
+                                            </label>
+                                        </div>
+                                        <button
+                                            onClick={handleSubscribe}
+                                            disabled={loading || subLoading || !agreedToTerms}
+                                            className="w-full relative overflow-hidden flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-400 text-white py-4 rounded-2xl transition-all shadow-[0_10px_30px_rgba(59,130,246,0.4)] group active:scale-[0.98] disabled:opacity-30 disabled:grayscale disabled:cursor-not-allowed"
+                                        >
+                                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                                            {loading ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} className="animate-pulse" />}
+                                            <span className="font-black text-sm uppercase tracking-widest">Activate Pro</span>
+                                        </button>
+                                    </div>
                                 )}
 
                                 {details?.isPro && (
@@ -242,6 +240,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                                         <span>Next charge: {details.trialDaysRemaining > 0 ? `Trial Ends in ${details.trialDaysRemaining}d` : details.expiryDate ? new Date(details.expiryDate).toLocaleDateString() : 'Active'}</span>
                                     </div>
                                 )}
+
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
@@ -257,9 +256,9 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                                 <button
                                     onClick={handleRestore}
                                     disabled={syncLoading !== null || loading}
-                                    className="flex flex-col items-center justify-center p-3 glass-panel hover:bg-white/5 text-white py-4 rounded-2xl transition-all border border-white/5 hover:border-accent-purple/30 group disabled:opacity-50"
+                                    className="flex flex-col items-center justify-center p-3 glass-panel hover:bg-white/5 text-white py-4 rounded-2xl transition-all border border-white/5 hover:border-brand-500/30 group disabled:opacity-50"
                                 >
-                                    {syncLoading === 'restore' ? <Loader2 size={20} className="animate-spin text-accent-purple mb-2" /> : <CloudDownload size={20} className="text-accent-purple mb-2 group-hover:translate-y-1 transition-transform" />}
+                                    {syncLoading === 'restore' ? <Loader2 size={20} className="animate-spin text-brand-400 mb-2" /> : <CloudDownload size={20} className="text-brand-400 mb-2 group-hover:translate-y-1 transition-transform" />}
                                     <span className="text-[10px] font-black uppercase tracking-tighter">Fetch Data</span>
                                 </button>
                             </div>
@@ -294,12 +293,16 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                                 {loading ? <Loader2 size={18} className="animate-spin inline mr-2" /> : null}
                                 {isSignUp ? 'Create Account' : 'Sign In'}
                             </button>
-                            <div className="text-center mt-4">
+                            <div className="text-center mt-4 space-y-4">
                                 <button type="button" onClick={() => setIsSignUp(!isSignUp)} className="text-xs text-slate-400 hover:text-white transition-colors">
                                     {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
                                 </button>
+                                <div className="text-[10px] text-slate-500 pt-4 border-t border-white/5">
+                                    By continuing, you agree to our <a href="/TERMS.md" target="_blank" className="text-blue-400 hover:underline">Terms</a> and <a href="/PRIVACY.md" target="_blank" className="text-blue-400 hover:underline">Privacy Policy</a>.
+                                </div>
                             </div>
                         </form>
+
                     )}
                 </div>
             </div>

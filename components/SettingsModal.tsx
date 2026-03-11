@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { Settings, VoiceName, NoiseLevel } from '../types';
-import { LANGUAGES, VOICES } from '../constants';
+import { VOICES } from '../constants';
 import { X, Mic, Volume2, Download, Upload, Trash2, HardDrive, Settings as SettingsIcon } from 'lucide-react';
 import CustomSelect from './CustomSelect';
 
@@ -180,7 +180,56 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             </button>
           </div>
 
+          {/* Neural Inputs (Device Selection) */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-slate-300">
+              <Mic size={18} />
+              <label className="text-sm font-medium">Neural Input Sensor</label>
+            </div>
+            <div className="space-y-2">
+              <select
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors appearance-none"
+                style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%2364748b\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.5em' }}
+              >
+                <option value="default">System Default (Auto-Switch)</option>
+                <option value="built-in">Core Processor Mic</option>
+                <option value="external">External Array (Detected)</option>
+              </select>
+              <p className="text-[10px] text-slate-500 px-1 font-mono uppercase tracking-widest">
+                Selecting a specific sensor improves neural isolation.
+              </p>
+            </div>
+          </div>
+
+          {/* App Downloads */}
+          <div className="pt-4 border-t border-slate-800">
+            <h3 className="text-sm font-semibold text-slate-400 mb-3 uppercase tracking-wider">Commercial Downloads</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <a
+                href="https://listeningproject.ai/api/download/android"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-col items-center justify-center p-4 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all group"
+              >
+                <Download size={24} className="text-brand-400 mb-2 group-hover:translate-y-0.5 transition-transform" />
+                <span className="text-xs font-bold text-white uppercase tracking-tighter">Android APK</span>
+                <span className="text-[9px] text-slate-500">v2.1.0-release</span>
+              </a>
+              <a
+                href="https://listeningproject.ai/api/download/desktop"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-col items-center justify-center p-4 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all group"
+              >
+                <Download size={24} className="text-brand-400 mb-2 group-hover:translate-y-0.5 transition-transform" />
+                <span className="text-xs font-bold text-white uppercase tracking-tighter">Windows EXE</span>
+                <span className="text-[9px] text-slate-500">v2.1.0-msi</span>
+              </a>
+            </div>
+          </div>
+
           {/* Data Management */}
+
           <div className="pt-4 border-t border-slate-800">
             <h3 className="text-sm font-semibold text-slate-400 mb-3 uppercase tracking-wider flex items-center justify-between">
               <span>Data Management</span>

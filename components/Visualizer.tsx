@@ -9,7 +9,7 @@ interface VisualizerProps {
 const Visualizer: React.FC<VisualizerProps> = ({
   analyserNode,
   isActive,
-  color = '#3b82f6',
+  color = '#00e5ff',
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
@@ -27,12 +27,7 @@ const Visualizer: React.FC<VisualizerProps> = ({
 
     const drawFlatLine = () => {
       ctx.clearRect(0, 0, WIDTH, HEIGHT);
-      ctx.beginPath();
-      ctx.moveTo(0, HEIGHT / 2);
-      ctx.lineTo(WIDTH, HEIGHT / 2);
-      ctx.strokeStyle = '#334155';
-      ctx.lineWidth = 2;
-      ctx.stroke();
+      // No line drawn here to keep UI clean per user request
     };
 
     if (!isActive || !analyserNode) {
@@ -40,6 +35,7 @@ const Visualizer: React.FC<VisualizerProps> = ({
       cancelAnimationFrame(animationRef.current);
       return;
     }
+
 
     // fftSize must be set on the AnalyserNode — this is a required Web Audio API configuration.
     // eslint-disable-next-line react-hooks/immutability
@@ -104,7 +100,8 @@ const Visualizer: React.FC<VisualizerProps> = ({
       ref={canvasRef}
       width={600}
       height={60}
-      className="w-full h-16 rounded-lg bg-slate-900/50 backdrop-blur-sm"
+      className="w-full h-full rounded-lg"
+
       role="img"
       aria-label="Audio frequency visualizer"
     />

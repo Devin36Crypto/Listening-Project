@@ -4,6 +4,7 @@ import type { Offerings, Package, CustomerInfo, EntitlementInfo } from "@revenue
 import { getSupabase } from './supabase';
 import { getPlatformType, PlatformType } from '../utils/platform';
 import { discoveryService } from './DiscoveryService';
+import { VIP_LIST } from '../constants';
 
 // RevenueCat public key from environment
 const REVENUECAT_U_KEY = import.meta.env.VITE_REVENUECAT_PUBLIC_KEY;
@@ -58,8 +59,29 @@ export const initSubscriptions = async (): Promise<Purchases | null> => {
 
 /**
  * Gets or sets the first launch date of the application.
+ * Now prioritized by Supabase trial_start_date if authenticated.
  */
-export const getFirstLaunchDate = (): Date => {
+export const getFirstLaunchDate = async (): Promise<Date> => {
+    try {
+        const supabase = await getSupabase();
+        if (supabase) {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) {
+                const { data, error } = await supabase
+                    .from('subscriptions')
+                    .select('trial_start_date')
+                    .eq('user_id', session.user.id)
+                    .single();
+
+                if (!error && data?.trial_start_date) {
+                    return new Date(data.trial_start_date);
+                }
+            }
+        }
+    } catch (err) {
+        console.warn('Failed to fetch trial date from Supabase:', err);
+    }
+
     const stored = localStorage.getItem('lp_first_launch');
     if (stored) return new Date(stored);
 
@@ -87,13 +109,13 @@ export interface DetailedSubscriptionStatus {
 export const getDetailedSubscriptionStatus = async (): Promise<DetailedSubscriptionStatus> => {
     const platform = getPlatformType();
     const prices = PRICING[platform];
-    const firstLaunch = getFirstLaunchDate();
+    const firstLaunch = await getFirstLaunchDate();
     const now = new Date();
     const diffTime = Math.max(0, now.getTime() - firstLaunch.getTime());
     const diffDays = Math.floor(diffTime / (1000 * 3600 * 24));
 
     // Default fallback (Free/Trial state)
-    let status: DetailedSubscriptionStatus = {
+    const status: DetailedSubscriptionStatus = {
         isPro: false,
         isTrial: diffDays < 3,
         trialDaysRemaining: Math.max(0, 3 - diffDays),
@@ -107,6 +129,20 @@ export const getDetailedSubscriptionStatus = async (): Promise<DetailedSubscript
     };
 
     try {
+        const supabase = await getSupabase();
+        if (supabase) {
+            const { data: { session } } = await supabase.auth.getSession();
+            const userEmail = session?.user?.email;
+            if (userEmail && VIP_LIST.includes(userEmail)) {
+                status.isPro = true;
+                status.isTrial = false;
+                status.hasExpired = false;
+                status.trialDaysRemaining = 0;
+                // Still count extra devices for cost estimation if needed, 
+                // but the user is fundamentally Pro.
+            }
+        }
+
         const purchases = await initSubscriptions();
         if (!purchases) return status;
 
@@ -152,6 +188,15 @@ export const getDetailedSubscriptionStatus = async (): Promise<DetailedSubscript
  */
 export const isProUser = async (): Promise<boolean> => {
     try {
+        const supabase = await getSupabase();
+        if (supabase) {
+            const { data: { session } } = await supabase.auth.getSession();
+            const userEmail = session?.user?.email;
+            if (userEmail && VIP_LIST.includes(userEmail)) {
+                return true;
+            }
+        }
+
         const purchases = await initSubscriptions();
         if (!purchases) return false;
         return await purchases.isEntitledTo('pro');
@@ -204,9 +249,10 @@ export const purchasePackage = async (
 // ─── Database Status (Supabase) ─────────────────────────────
 
 export interface SubscriptionStatus {
-    status: 'active' | 'expired' | 'cancelled' | 'billing_retry' | 'paused' | 'inactive';
+    status: 'active' | 'expired' | 'cancelled' | 'billing_retry' | 'paused' | 'inactive' | 'trialing';
     product_id: string | null;
     current_period_end: string | null;
+    trial_start_date: string | null;
 }
 
 export const getSubscriptionStatus = async (): Promise<SubscriptionStatus> => {
@@ -214,6 +260,7 @@ export const getSubscriptionStatus = async (): Promise<SubscriptionStatus> => {
         status: 'inactive',
         product_id: null,
         current_period_end: null,
+        trial_start_date: null,
     };
 
     try {
@@ -231,6 +278,7 @@ export const getSubscriptionStatus = async (): Promise<SubscriptionStatus> => {
             status: data.status,
             product_id: data.product_id,
             current_period_end: data.current_period_end,
+            trial_start_date: data.trial_start_date,
         };
     } catch {
         return fallback;

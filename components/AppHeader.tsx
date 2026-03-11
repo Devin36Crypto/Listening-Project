@@ -14,7 +14,6 @@ interface AppHeaderProps {
     connectedMics: number;
     activeMode: AppMode;
     handleOfflineModeToggle: () => void;
-    setIsPocketMode: (val: boolean) => void;
     setShowSpeakerManager: (val: boolean) => void;
     setShowHistory: (val: boolean) => void;
     setShowVaultModal: (val: boolean) => void;
@@ -22,30 +21,28 @@ interface AppHeaderProps {
     setShowAuthModal: (val: boolean) => void;
     vaultKey: string | null;
     nodes: PeerNode[];
-    onScan: () => void;
 }
 
 const AppHeader: React.FC<AppHeaderProps> = ({
     connectedMics,
     activeMode,
     handleOfflineModeToggle,
-    setIsPocketMode,
     setShowSpeakerManager,
     setShowHistory,
     setShowVaultModal,
     setShowSettings,
     setShowAuthModal,
     vaultKey,
-    nodes,
-    onScan
+    nodes
 }) => {
     const activeNodesCount = nodes.filter(n => n.status === 'online' || n.status === 'connected').length;
 
     return (
         <header className="flex-none px-4 md:px-8 glass-panel backdrop-blur-3xl border-b border-white/10 flex justify-between items-center z-10 pt-[calc(env(safe-area-inset-top,20px)+6px)] pb-2.5 mx-4 mt-4 rounded-2xl shadow-2xl relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 pointer-events-none" />
+
+            <div className="absolute inset-0 bg-gradient-to-r from-brand-500/5 to-cyan-500/5 pointer-events-none" />
             <div className="flex-1 flex items-center gap-3 relative z-10">
-                <img src="./icon.png" alt="LP Logo" className="w-14 h-14 drop-shadow-2xl rounded-xl" />
+                <img src="./icon.png" alt="ListeningProject Logo" className="w-14 h-14 drop-shadow-2xl rounded-xl" />
                 <div className="flex flex-col">
                     <h1 className="font-bold text-lg tracking-tight text-white leading-none">ListeningProject</h1>
                 </div>
@@ -84,7 +81,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                 </button>
                 <button
                     onClick={() => setShowVaultModal(true)}
-                    className={`p-2 rounded-xl transition-all border ${vaultKey ? 'bg-purple-900/40 border-purple-500/30 text-purple-300 shadow-lg' : 'hover:bg-white/5 border-transparent text-slate-400 hover:text-white'}`}
+                    className={`p-2 rounded-xl transition-all border ${vaultKey ? 'bg-brand-900/40 border-brand-500/30 text-brand-300 shadow-lg' : 'hover:bg-white/5 border-transparent text-slate-400 hover:text-white'}`}
                     title="Privacy Vault"
                 >
                     <Shield size={26} />
@@ -93,7 +90,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             <div className="flex-1 flex items-center justify-end gap-2 relative z-10">
                 <button
                     onClick={() => setShowAuthModal(true)}
-                    className={`p-2 rounded-xl transition-all ${activeMode === AppMode.LOCKED ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40 animate-bounce' : 'hover:bg-white/5 text-slate-400 hover:text-white'}`}
+                    className={`p-2 rounded-xl transition-all ${activeMode === AppMode.LOCKED ? 'bg-brand-600 text-white shadow-lg shadow-brand-900/40 animate-bounce' : 'hover:bg-white/5 text-slate-400 hover:text-white'}`}
                     title="Account"
                 >
                     <User size={26} />

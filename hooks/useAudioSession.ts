@@ -44,7 +44,7 @@ export function useAudioSession(
     const audioContextOutput = useRef<AudioContext | null>(null);
     const activeStreamsRef = useRef<MediaStream[]>([]);
     const workletNodeRef = useRef<AudioWorkletNode | null>(null);
-    const sessionPromiseRef = useRef<Promise<unknown> | null>(null);
+    const sessionPromiseRef = useRef<Promise<any> | null>(null);
     const nextStartTimeRef = useRef<number>(0);
     const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
     const wakeLockRef = useRef<WakeLockSentinel | null>(null);
@@ -52,18 +52,19 @@ export function useAudioSession(
     const offlineChunksRef = useRef<Float32Array[]>([]);
     const currentInputTranscription = useRef('');
     const currentOutputTranscription = useRef('');
+
     // Silent MP3 for background audio persistence
     useEffect(() => {
         const audio = new Audio();
         audio.loop = true;
-        audio.src =
-            'data:audio/mp3;base64,SUQzBAAAAAAAI1RTSVMAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////wAAAAAATGF2YzU4LjU0AAAAAAAAAAAAAAAAAAAAAAAAAAAACCAAAAAAAAAAAAAA//OEMAAAAAAAABAAAAAAAAAAABFhAAAAAAAAAAAAAA==';
+        audio.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTSVMAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////wAAAAAATGF2YzU4LjU0AAAAAAAAAAAAAAAAAAAAAAAAAAAACCAAAAAAAAAAAAAA//OEMAAAAAAAABAAAAAAAAAAABFhAAAAAAAAAAAAAA==';
         backgroundAudioRef.current = audio;
         return () => {
             backgroundAudioRef.current?.pause();
             backgroundAudioRef.current = null;
         };
     }, []);
+
     const requestWakeLock = async () => {
         if ('wakeLock' in navigator) {
             try {
@@ -73,10 +74,12 @@ export function useAudioSession(
             }
         }
     };
+
     const releaseWakeLock = () => {
         wakeLockRef.current?.release().catch(() => { });
         wakeLockRef.current = null;
     };
+
     const enableBackgroundMode = useCallback(() => {
         backgroundAudioRef.current?.play().catch(e => console.warn('Background audio failed', e));
         if ('mediaSession' in navigator) {
@@ -84,41 +87,52 @@ export function useAudioSession(
                 title: 'ListeningProject Active',
                 artist: activeMode === AppMode.OFFLINE_MODE ? 'Offline Mode' : 'Live Translator',
                 album: 'Background Listening',
-                artwork: [{ src: '/icon.png', sizes: '512x512', type: 'image/png' }],
+                artwork: [{ src: './icon.png', sizes: '512x512', type: 'image/png' }],
             });
             navigator.mediaSession.playbackState = 'playing';
-            navigator.mediaSession.setActionHandler('play', () => { });
-            navigator.mediaSession.setActionHandler('pause', () => { });
         }
     }, [activeMode]);
+
     const disableBackgroundMode = useCallback(() => {
         backgroundAudioRef.current?.pause();
         if ('mediaSession' in navigator) {
             navigator.mediaSession.playbackState = 'none';
         }
     }, []);
-    // Re-acquire wake lock on visibility change
-    useEffect(() => {
-        const handle = () => {
-            if (document.visibilityState === 'visible' && isRecording) requestWakeLock();
-            else if (isRecording) addLog('system', 'Background mode active. Listening continues...');
-        };
-        document.addEventListener('visibilitychange', handle);
-        return () => document.removeEventListener('visibilitychange', handle);
-    }, [isRecording, addLog]);
+
+    const handleError = useCallback((err: any, context: string) => {
+        console.error(`AudioSession Error [${context}]:`, err);
+        let msg = 'Neural synchronization failure.';
+
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError' || err.message === 'PermissionDenied') {
+            msg = 'Microphone access denied. Check browser permissions.';
+        } else if (err.message === 'No audio sensors available.') {
+            msg = 'No audio input sensors detected.';
+        } else if (err.message?.includes('API_KEY')) {
+            msg = 'Security token invalid or missing.';
+        } else if (context === 'session') {
+            msg = 'Connection to neural engine disrupted.';
+        }
+
+        addLog('system', `${msg} (${err.message || 'Unknown'})`, true);
+        setIsRecording(false);
+        releaseWakeLock();
+        disableBackgroundMode();
+    }, [addLog, disableBackgroundMode]);
+
     const initializeMultiInputAudio = async (ctx: AudioContext): Promise<AudioWorkletNode> => {
         let devices: MediaDeviceInfo[] = [];
         try { devices = await navigator.mediaDevices.enumerateDevices(); } catch (e) {
             console.debug('Failed to enumerate devices:', e);
         }
+
         const audioInputs = devices.filter(d => d.kind === 'audioinput');
-        const specific = audioInputs.filter(d => d.deviceId !== 'default' && d.deviceId !== 'communications');
-        const toTry = specific.slice(0, 4).length > 0 ? specific.slice(0, 4) : audioInputs.slice(0, 1);
+        const toTry = audioInputs.filter(d => d.deviceId !== 'default' && d.deviceId !== 'communications').slice(0, 4);
+        if (toTry.length === 0 && audioInputs.length > 0) toTry.push(audioInputs[0]);
+
         const merger = ctx.createChannelMerger(1);
         const constraints = getAudioConstraints(settings.noiseCancellationLevel);
-        addLog('system', `Optimizing array... Using up to ${toTry.length} sensors.`);
 
-        let streamCount = 0;
         const scanResults = await Promise.all(
             toTry.map(async device => {
                 try {
@@ -129,42 +143,36 @@ export function useAudioSession(
                     ctx.createMediaStreamSource(stream).connect(merger);
                     return true;
                 } catch (e) {
-                    console.warn(`Failed to access sensor ${device.label || device.deviceId}:`, e);
+                    // Log failure for this specific device but don't halt the whole scan
+                    console.warn(`Sensor access failed: ${device.label || device.deviceId}`);
                     return false;
                 }
             })
         );
-        streamCount = scanResults.filter(Boolean).length;
+
+        let streamCount = scanResults.filter(Boolean).length;
         if (streamCount === 0) {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: constraints });
                 activeStreamsRef.current.push(stream);
                 ctx.createMediaStreamSource(stream).connect(merger);
                 streamCount = 1;
-                addLog('system', 'Using primary sensor array.');
-            } catch (e: unknown) {
-                if (e instanceof Error && (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError')) throw new Error('PermissionDenied', { cause: e });
-                throw new Error('No audio sensors available.', { cause: e });
+            } catch (e) {
+                throw new Error('No audio sensors available.');
             }
-        } else {
-            addLog('system', `Audio Fusion Active: ${streamCount} sensors online.`);
-            if (settings.noiseCancellationLevel === 'high') addLog('system', 'Beamforming & Noise Suppression: ENABLED');
         }
+
         setConnectedMics(streamCount);
         const analyser = ctx.createAnalyser();
         analyser.fftSize = 1024;
-        analyser.smoothingTimeConstant = 0.75;
         setAnalyserNode(analyser);
-        // Load and initialize AudioWorklet (prevent redundant loads)
+
         try {
             await ctx.audioWorklet.addModule(audioProcessorUrl);
-        } catch (e: unknown) {
-            // Ignore if already added, but log other failures
-            if (e instanceof Error && !e.message?.includes('already registered')) {
-                console.error('Failed to load AudioWorklet module:', e, audioProcessorUrl);
-                throw new Error('AudioWorklet module failed to load. Check storage/paths.', { cause: e });
-            }
+        } catch (e: any) {
+            if (!e.message?.includes('already registered')) throw e;
         }
+
         const workletNode = new AudioWorkletNode(ctx, 'audio-processor');
         merger.connect(analyser);
         analyser.connect(workletNode);
@@ -172,38 +180,32 @@ export function useAudioSession(
         workletNodeRef.current = workletNode;
         return workletNode;
     };
+
     const teardownAudio = useCallback(() => {
         setIsRecording(false);
-        try {
-            if (workletNodeRef.current) {
-                workletNodeRef.current.port.onmessage = null;
-                workletNodeRef.current.disconnect();
-            }
-        } catch (e) {
-            console.warn('Worklet disconnect failed:', e);
+        if (workletNodeRef.current) {
+            workletNodeRef.current.port.onmessage = null;
+            workletNodeRef.current.disconnect();
+            workletNodeRef.current = null;
         }
-        workletNodeRef.current = null;
         setAnalyserNode(null);
         activeStreamsRef.current.forEach(s => {
-            try {
-                s.getTracks().forEach(t => {
-                    t.stop();
-                    t.enabled = false;
-                });
-            } catch (e) {
-                console.debug('Failed to stop track:', e);
-            }
+            s.getTracks().forEach(t => t.stop());
         });
         activeStreamsRef.current = [];
-        try {
-            if (audioContextInput.current && audioContextInput.current.state !== 'closed') {
-                audioContextInput.current.close().catch(() => { });
-            }
-        } catch (e) {
-            console.debug('Failed to close input context:', e);
+
+        // Clear audio sources to prevent memory leaks
+        sourcesRef.current.forEach(source => {
+            try { source.stop(); source.disconnect(); } catch (e) { }
+        });
+        sourcesRef.current.clear();
+
+        if (audioContextInput.current && audioContextInput.current.state !== 'closed') {
+            audioContextInput.current.close().catch(() => { });
         }
         audioContextInput.current = null;
     }, []);
+
     const startSession = async () => {
         if (isRecording) return;
         try {
@@ -213,78 +215,66 @@ export function useAudioSession(
             await requestWakeLock();
             enableBackgroundMode();
 
-            const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
             audioContextInput.current = new AudioContextClass({ sampleRate: INPUT_SAMPLE_RATE });
             audioContextOutput.current = new AudioContextClass({ sampleRate: OUTPUT_SAMPLE_RATE });
 
-            await audioContextInput.current.resume();
-            await audioContextOutput.current.resume();
+            await Promise.all([audioContextInput.current?.resume(), audioContextOutput.current?.resume()]);
 
             const workletNode = await initializeMultiInputAudio(audioContextInput.current);
-            workletNodeRef.current = workletNode;
-
             const finalApiKey = apiKeyProp === 'STUDIO_MANAGED' ? undefined : (apiKeyProp || undefined);
             const ai = new GoogleGenAI({ apiKey: finalApiKey });
-
-            const translatorInstruction = `You are "ListeningProject".
-CORE PROTOCOLS:
-1. UNIVERSAL TRANSLATOR: Translate EVERYTHING you hear into the target language (**${settings.targetLanguage}**).
-2. MULTI-LANGUAGE SCANNING: Listen for ANY and ALL languages.
-3. SPEAKER ID: Start EVERY output line with [Speaker Label]:.
-   Example: [Spanish Speaker 1]: The translation goes here.
-4. TARGET-LANGUAGE HANDLING: If you hear the target language, transcribe it verbatim to preserve the record.
-5. NO LATENCY: Provide the translation as soon as the speaker begins. Do not wait for long pauses.`;
-
-            const assistantInstruction = `You are "ListeningProject Assistant". 
-CORE PROTOCOLS:
-1. SPEAKER TRACKING: Identify speakers with [Speaker Name]: format.
-2. CONTEXTUAL AWARENESS: Use integrated search grounding to explain cultural references or terms mentioned in the audio.
-3. LANGUAGE: Always respond in the user's selected target language (**${settings.targetLanguage}**).`;
 
             const sessionPromise = ai.live.connect({
                 model: MODEL_LIVE,
                 config: {
                     responseModalities: [Modality.AUDIO],
                     speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: settings.voice } } },
-                    systemInstruction: activeMode === AppMode.LIVE_TRANSLATOR ? translatorInstruction : assistantInstruction,
-                    inputAudioTranscription: {},
-                    outputAudioTranscription: {},
+                    systemInstruction: {
+                        parts: [{
+                            text: activeMode === AppMode.LIVE_TRANSLATOR
+                                ? `You are "ListeningProject". Translate EVERYTHING to ${settings.targetLanguage}. Identify speakers with [Label]:. Be fast.`
+                                : `You are "Assistant". Help the user in ${settings.targetLanguage}. Identify speakers with [Name]:.`
+                        }]
+                    },
                 },
                 callbacks: {
                     onopen: () => {
                         setIsRecording(true);
+                        addLog('system', 'Neural link established.');
                         workletNode.port.onmessage = (e) => {
+                            if (!isRecording) return;
                             const base64 = createPcmBase64(e.data);
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            sessionPromiseRef.current?.then((session: any) => session.sendRealtimeInput({
-                                media: {
-                                    mimeType: `audio/pcm;rate=${INPUT_SAMPLE_RATE}`,
-                                    data: base64
+                            sessionPromiseRef.current?.then(session => {
+                                if (isRecording) {
+                                    session.sendRealtimeInput({
+                                        media: { mimeType: `audio/pcm;rate=${INPUT_SAMPLE_RATE}`, data: base64 }
+                                    });
                                 }
-                            }));
+                            });
                         };
                     },
                     onmessage: async (msg: LiveServerMessage) => {
                         const { serverContent } = msg;
                         if (serverContent?.inputTranscription?.text) currentInputTranscription.current += serverContent.inputTranscription.text;
                         if (serverContent?.outputTranscription?.text) currentOutputTranscription.current += serverContent.outputTranscription.text;
+
                         if (serverContent?.turnComplete) {
-                            if (currentOutputTranscription.current.trim()) {
-                                const full = currentOutputTranscription.current.trim();
+                            const full = currentOutputTranscription.current.trim();
+                            if (full) {
                                 const match = full.match(/^\[(.*?)]:?\s*(.*)/s);
                                 if (match) addLog('model', match[2], false, match[1]);
                                 else addLog('model', full);
-                                currentOutputTranscription.current = '';
                             }
+                            currentOutputTranscription.current = '';
                             currentInputTranscription.current = '';
                         }
+
                         const base64Audio = serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
                         if (base64Audio && audioContextOutput.current) {
                             const ctx = audioContextOutput.current;
-                            if (ctx.state === 'suspended') await ctx.resume();
                             nextStartTimeRef.current = Math.max(nextStartTimeRef.current, ctx.currentTime);
-                            const audioBytes = decodeBase64(base64Audio);
-                            const audioBuffer = await decodeAudioData(audioBytes, ctx, OUTPUT_SAMPLE_RATE);
+                            const audioBuffer = await decodeAudioData(decodeBase64(base64Audio), ctx, OUTPUT_SAMPLE_RATE);
                             const source = ctx.createBufferSource();
                             source.buffer = audioBuffer;
                             source.connect(ctx.destination);
@@ -294,87 +284,66 @@ CORE PROTOCOLS:
                             sourcesRef.current.add(source);
                         }
                     },
-                    onclose: () => { addLog('system', 'Neural link severed.'); setIsRecording(false); releaseWakeLock(); },
-                    onerror: (err) => {
-                        console.error('Session Error:', err);
-                        addLog('system', 'Connection disrupted. Please check your connection.', true);
+                    onclose: () => {
+                        addLog('system', 'Neural link severed.');
                         setIsRecording(false);
-                        releaseWakeLock();
                     },
+                    onerror: (err) => handleError(err, 'session'),
                 },
             });
             sessionPromiseRef.current = sessionPromise;
-        } catch (err: unknown) {
-            let msg = 'Critical Failure: Audio Sensors Unreachable.';
-            const errorObj = err instanceof Error ? err : new Error(String(err));
-            if (errorObj.message === 'PermissionDenied' || errorObj.name === 'NotAllowedError') msg = 'Microphone access denied. Enable permissions in browser settings.';
-            else if (errorObj.message === 'No audio sensors available.') msg = 'No microphone found. Please connect an audio device.';
-            else if (errorObj.message === 'API_KEY_MISSING') msg = 'API Configuration Error: VITE_GEMINI_API_KEY is missing from environment.';
-            else if (errorObj.message?.includes('API_KEY')) msg = 'API Configuration Error: Invalid API Key.';
-            addLog('system', `${msg} [${errorObj.message || 'Unknown Error'}]`, true);
-            releaseWakeLock();
-            disableBackgroundMode();
-            setIsRecording(false);
+        } catch (err) {
+            handleError(err, 'start');
         }
     };
+
     const stopSession = useCallback(() => {
         teardownAudio();
-        try {
-            if (audioContextOutput.current && audioContextOutput.current.state !== 'closed') {
-                audioContextOutput.current.close()?.catch(() => { });
-            }
-        } catch (e) {
-            console.debug('Failed to close output context:', e);
+        if (audioContextOutput.current && audioContextOutput.current.state !== 'closed') {
+            audioContextOutput.current.close().catch(() => { });
         }
         audioContextOutput.current = null;
-        if (currentOutputTranscription.current.trim()) {
-            addLog('model', currentOutputTranscription.current.trim());
-            currentOutputTranscription.current = '';
-        }
         setIsRecording(false);
         sessionPromiseRef.current = null;
         releaseWakeLock();
         disableBackgroundMode();
-        addLog('system', 'System halted.');
+        addLog('system', 'System offline.');
     }, [disableBackgroundMode, teardownAudio, addLog]);
+
     const startOfflineRecording = async () => {
         if (isRecording) return;
         try {
-            addLog('system', 'Initializing Offline Mode...');
+            addLog('system', 'Activating Offline Matrix...');
             await requestWakeLock();
             enableBackgroundMode();
-            const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
             audioContextInput.current = new AudioContextClass({ sampleRate: INPUT_SAMPLE_RATE });
             await audioContextInput.current.resume();
             const workletNode = await initializeMultiInputAudio(audioContextInput.current);
-            workletNodeRef.current = workletNode;
             offlineChunksRef.current = [];
-            workletNode.port.onmessage = (e) => {
-                offlineChunksRef.current.push(new Float32Array(e.data));
-            };
+            workletNode.port.onmessage = (e) => offlineChunksRef.current.push(new Float32Array(e.data));
             setIsRecording(true);
-            addLog('system', 'Offline Recording Started. Speak now.');
-        } catch {
-            addLog('system', 'Failed to start offline recording.', true);
-            setIsRecording(false);
+        } catch (err) {
+            handleError(err, 'offline-start');
         }
     };
+
     const stopOfflineRecording = useCallback(() => {
-        if (!workletNodeRef.current) return;
         teardownAudio();
-        setIsRecording(false);
         releaseWakeLock();
         disableBackgroundMode();
-        addLog('system', 'Processing offline audio...');
+        addLog('system', 'Processing local audio buffer...');
         onOfflineChunks(offlineChunksRef.current);
         offlineChunksRef.current = [];
     }, [disableBackgroundMode, onOfflineChunks, teardownAudio, addLog]);
+
     // Cleanup on unmount
     useEffect(() => {
         return () => {
-            stopSession();
+            if (isRecording) stopSession();
         };
-    }, [stopSession]);
+    }, [stopSession, isRecording]);
+
     return {
         isRecording,
         connectedMics,
@@ -385,3 +354,4 @@ CORE PROTOCOLS:
         stopOfflineRecording,
     };
 }
+

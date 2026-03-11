@@ -11,19 +11,16 @@ export const getSpeakerColor = (speakerId: string): string => {
     'bg-cyan-500',
     'bg-sky-500',
     'bg-blue-500',
-    'bg-indigo-500',
-    'bg-violet-500',
-    'bg-purple-500',
     'bg-fuchsia-500',
     'bg-pink-500',
     'bg-rose-500',
   ];
-  
+
   let hash = 0;
   for (let i = 0; i < speakerId.length; i++) {
     hash = speakerId.charCodeAt(i) + ((hash << 5) - hash);
   }
-  
+
   const index = Math.abs(hash) % colors.length;
   return colors[index];
 };

@@ -9,8 +9,10 @@ declare global {
   }
 }
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { Key, Wifi } from 'lucide-react';
+
+// Components
 import AppHeader from './components/AppHeader';
 import ChatList from './components/ChatList';
 import ControlPanel from './components/ControlPanel';
@@ -18,274 +20,69 @@ import ModalsLayer from './components/ModalsLayer';
 import AuthModal from './components/AuthModal';
 import PocketModeOverlay from './components/PocketModeOverlay';
 import SpatialMap from './components/SpatialMap';
-import { LogMessage, AppMode, Settings, PeerNode, BeforeInstallPromptEvent } from './types';
-import { useOfflineWorker } from './hooks/useOfflineWorker';
+
+// Types & Hooks
+import { AppMode, PeerNode, BeforeInstallPromptEvent } from './types';
+import { useAppUI } from './hooks/useAppUI';
+import { useSubscription } from './hooks/useSubscription';
 import { useAudioSession } from './hooks/useAudioSession';
-import { saveSession, importSessions, clearAllSessions, getStorageUsage } from './services/db';
+import { useOfflineWorker } from './hooks/useOfflineWorker';
+
+// Services & Utils
 import { getSpeakerColor, getSpeakerInitials } from './utils/colors';
-import { discoveryService } from './services/DiscoveryService';
-import { initSubscriptions, getDetailedSubscriptionStatus } from './services/subscriptions';
+import { getStorageUsage, saveSession } from './services/db';
 
 const App: React.FC = () => {
-  // --- UI State ---
-  const [activeMode, setActiveMode] = useState<AppMode>(AppMode.LIVE_TRANSLATOR);
-  const [isPocketMode, setIsPocketMode] = useState<boolean>(false);
-  const [showTranscript, setShowTranscript] = useState<boolean>(true);
-  const [logs, setLogs] = useState<LogMessage[]>([]);
-  const [showSettings, setShowSettings] = useState<boolean>(false);
-  const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
-  const [showOfflineWarning, setShowOfflineWarning] = useState<boolean>(false);
-  const [showHistory, setShowHistory] = useState<boolean>(false);
-  const [showSpeakerManager, setShowSpeakerManager] = useState<boolean>(false);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [apiKey, setApiKey] = useState<string | null>(null);
-  const [manualKey, setManualKey] = useState<string>('');
-  const [settings, setSettings] = useState<Settings>({
-    targetLanguage: 'English',
-    voice: 'Puck',
-    autoSpeak: true,
-    noiseCancellationLevel: 'high',
-    pushToTalk: false,
-  });
-  const [storageUsage, setStorageUsage] = useState<number>(0);
-  const [vaultKey, setVaultKey] = useState<string | null>(null);
-  const [showVaultModal, setShowVaultModal] = useState<boolean>(false);
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [showSpatialMap, setShowSpatialMap] = useState<boolean>(false);
+  // --- Custom Hooks ---
+  const appUI = useAppUI();
+  const { isPro: subIsPro } = useSubscription();
 
-  // --- Peer Discovery State ---
-  const [nodes, setNodes] = useState<PeerNode[]>([]);
-
+  // --- State Synchronization & Unlock Logic ---
   useEffect(() => {
-    // 1. Peer Discovery (Throttled for performance)
-    let lastUpdate = 0;
-    discoveryService.setUpdateListener((newNodes) => {
-      const now = Date.now();
-      if (now - lastUpdate > 500) {
-        setNodes(newNodes);
-        lastUpdate = now;
-      }
-    });
-
-    // 2. Auth & Subscriptions Initialization
-    const initBackend = async () => {
-      try {
-        await initSubscriptions();
-        const sub = await getDetailedSubscriptionStatus();
-        if (sub.hasExpired && !sub.isPro) {
-          setActiveMode(AppMode.LOCKED);
-        }
-      } catch (err) {
-        console.error("Failed to initialize RevenueCat:", err);
-      }
-    };
-    initBackend();
-  }, []);
-
-  // Unlock when Pro status changes
-  useEffect(() => {
-    if (activeMode === AppMode.LOCKED) {
-      const checkUnlock = async () => {
-        const sub = await getDetailedSubscriptionStatus();
-        if (sub.isPro) {
-          setActiveMode(AppMode.LIVE_TRANSLATOR);
-        }
-      };
-      // Check every 5 seconds while locked (or we could use a listener)
-      const interval = setInterval(checkUnlock, 5000);
-      return () => clearInterval(interval);
+    if (appUI.activeMode === AppMode.LOCKED && subIsPro) {
+      appUI.setActiveMode(AppMode.LIVE_TRANSLATOR);
     }
-  }, [activeMode]);
+  }, [appUI.activeMode, subIsPro, appUI.setActiveMode]);
 
-  const handleScanPeers = useCallback(() => {
-    setShowSpatialMap(true);
-    discoveryService.scanForPeers();
-  }, []);
-
-  // --- Listen for PWA install prompt ---
+  // --- PWA & UI Effects ---
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
+      appUI.setDeferredPrompt(e as BeforeInstallPromptEvent);
     };
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-  }, []);
+  }, [appUI]);
 
   const handleInstallApp = useCallback(async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
+    if (!appUI.deferredPrompt) return;
+    appUI.deferredPrompt.prompt();
+    const { outcome } = await appUI.deferredPrompt.userChoice;
     if (outcome === 'accepted') {
-      setDeferredPrompt(null);
+      appUI.setDeferredPrompt(null);
     }
-  }, [deferredPrompt]);
+  }, [appUI.deferredPrompt]);
 
-  // --- Update storage usage when settings open ---
   useEffect(() => {
-    if (showSettings) {
-      getStorageUsage().then(setStorageUsage);
+    if (appUI.showSettings) {
+      getStorageUsage().then(appUI.setStorageUsage);
     }
-  }, [showSettings, vaultKey]);
-
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization
-  const handleImportData = useCallback(async (file: File) => {
-    try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-      if (data.sessions && Array.isArray(data.sessions)) {
-        await importSessions(data.sessions, vaultKey);
-        alert('History imported successfully!');
-      }
-      if (data.settings) setSettings(data.settings);
-      if (data.speakerRegistry) setSpeakerRegistry(data.speakerRegistry);
-      getStorageUsage().then(setStorageUsage);
-    } catch (error) {
-      console.error('Import failed:', error);
-      alert('Failed to import data. Invalid file format.');
-    }
-  }, [vaultKey]);
-
-  const handleClearData = useCallback(async () => {
-    if (window.confirm('Are you sure you want to delete ALL local history? This cannot be undone.')) {
-      await clearAllSessions();
-      setLogs([]); // Clear current view too
-      getStorageUsage().then(setStorageUsage);
-      alert('All local data cleared.');
-    }
-  }, []);
-
-  // --- Speaker Management State ---
-  const [speakerRegistry, setSpeakerRegistry] = useState<Record<string, string>>({});
-
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization
-  const renameSpeaker = useCallback((id: string, newName: string) => {
-    setSpeakerRegistry(prev => ({ ...prev, [id]: newName }));
-  }, []);
-
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization
-  const deleteSpeaker = useCallback((id: string) => {
-    setSpeakerRegistry(prev => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-  }, []);
+  }, [appUI.showSettings, appUI.vaultKey, appUI.setStorageUsage]);
 
   // --- Offline Worker ---
   const { status: offlineStatus, result: offlineResult, transcribe: offlineTranscribe } = useOfflineWorker();
 
-  // --- Helper: Add Log ---
-  const addLog = useCallback(
-    (
-      role: 'user' | 'model' | 'system' | 'date-marker',
-      text: string,
-      isError: boolean = false,
-      speakerId?: string
-    ) => {
-      setLogs((prev: LogMessage[]) => [
-        ...prev,
-        { id: crypto.randomUUID(), role, text, timestamp: new Date(), isError, speakerId },
-      ]);
-    },
-    []
-  );
-
-  // --- Consolidated API Key Initialization & Privacy Vault Logic ---
-  const handleExport = useCallback(() => {
-    const backupData = {
-      version: '1.0',
-      timestamp: new Date().toISOString(),
-      settings,
-      speakerRegistry,
-      logs,
-    };
-    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `lp-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    addLog('system', 'Backup exported successfully.');
-  }, [settings, speakerRegistry, logs, addLog]);
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, react-hooks/preserve-manual-memoization
-  const handleSelectSession = useCallback((session: any) => {
-    if (session.mode === AppMode.LOCKED) {
-      setShowHistory(false);
-      setShowVaultModal(true);
-      return;
-    }
-    setLogs(session.logs);
-    setSpeakerRegistry(session.speakerRegistry);
-    setActiveMode(session.mode);
-    setSettings(prev => ({ ...prev, targetLanguage: session.targetLanguage }));
-    setCurrentSessionId(session.id);
-    setShowHistory(false);
-  }, []);
-
-  const handleConnectApiKey = useCallback(async () => {
-    if (window.aistudio && window.aistudio.openSelectKey) {
-      await window.aistudio.openSelectKey();
-      setApiKey('STUDIO_MANAGED');
-    } else {
-      alert("API Key selection is not available in this environment. Please set VITE_GEMINI_API_KEY in .env");
-    }
-  }, []);
-
-  const initializeApiKey = useCallback(async () => {
-    let key = import.meta.env.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : null);
-    if (!key) {
-      key = localStorage.getItem('gemini_api_key');
-    }
-    if (!key && window.aistudio?.hasSelectedApiKey) {
-      const hasStudioKey = await window.aistudio.hasSelectedApiKey();
-      if (hasStudioKey) {
-        setApiKey('STUDIO_MANAGED');
-        return;
-      }
-    }
-    if (key) {
-      setApiKey(key);
-    } else {
-      if (window.aistudio?.openSelectKey) {
-        handleConnectApiKey();
-      } else {
-        setShowVaultModal(true);
-      }
-    }
-  }, [handleConnectApiKey]);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    initializeApiKey();
-  }, [initializeApiKey]);
-
-  const handleSaveManualKey = () => {
-    if (manualKey.trim().length > 10) {
-      localStorage.setItem('gemini_api_key', manualKey.trim());
-      setApiKey(manualKey.trim());
-      window.location.reload();
-    } else {
-      alert("Please enter a valid API Key.");
-    }
-  };
-
   // --- Handle offline chunks from audio session ---
-  const handleOfflineChunks = useCallback((chunks: Float32Array[]) => {
+  const handleOfflineChunksWithTranscribe = useCallback((chunks: Float32Array[]) => {
     if (chunks.length === 0) return;
     const totalLength = chunks.reduce((acc, c) => acc + c.length, 0);
     const merged = new Float32Array(totalLength);
     let offset = 0;
     for (const chunk of chunks) { merged.set(chunk, offset); offset += chunk.length; }
-    const lang = settings.targetLanguage.toLowerCase().split(' ')[0].replace(/[()]/g, '');
+    const lang = appUI.settings.targetLanguage.toLowerCase().split(' ')[0].replace(/[()]/g, '');
     offlineTranscribe(merged, lang);
-  }, [offlineTranscribe, settings.targetLanguage]);
+  }, [offlineTranscribe, appUI.settings.targetLanguage]);
 
-  // --- Audio Session Hook ---
   const {
     isRecording,
     connectedMics,
@@ -294,84 +91,76 @@ const App: React.FC = () => {
     stopSession,
     startOfflineRecording,
     stopOfflineRecording,
-  } = useAudioSession(settings, activeMode, addLog, handleOfflineChunks, apiKey);
+  } = useAudioSession(appUI.settings, appUI.activeMode, appUI.addLog, handleOfflineChunksWithTranscribe, appUI.apiKey);
 
-  // --- Offline Result Handling ---
-  useEffect(() => {
-    if (offlineResult) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { task, output } = offlineResult as { task: string; output: any };
-      if (task === 'transcribe') {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        addLog('model', `[Offline]: ${output.text}`);
-      }
-    }
-  }, [offlineResult, addLog]);
-
+  // --- Recording Toggle Bridge ---
   const toggleRecording = useCallback(() => {
     if (isRecording) {
-      if (activeMode === AppMode.OFFLINE_MODE) {
+      if (appUI.activeMode === AppMode.OFFLINE_MODE) {
         stopOfflineRecording();
       } else {
         stopSession();
       }
     } else {
       const newSessionId = Date.now().toString();
-      setCurrentSessionId(newSessionId);
-      setLogs([]);
-      if (activeMode === AppMode.OFFLINE_MODE) {
+      appUI.setCurrentSessionId(newSessionId);
+      appUI.setLogs([]);
+      if (appUI.activeMode === AppMode.OFFLINE_MODE) {
         startOfflineRecording();
       } else {
         startSession();
       }
     }
-  }, [isRecording, activeMode, stopOfflineRecording, stopSession, startOfflineRecording, startSession]);
+  }, [isRecording, appUI.activeMode, stopOfflineRecording, stopSession, startOfflineRecording, startSession, appUI]);
 
-  const handleOfflineModeToggle = useCallback(() => {
-    if (activeMode === AppMode.OFFLINE_MODE) {
-      setActiveMode(AppMode.LIVE_TRANSLATOR);
-    } else {
-      setShowOfflineWarning(true);
+  // --- Offline Result Handling ---
+  useEffect(() => {
+    if (offlineResult) {
+      const { task, output } = offlineResult as { task: string; output: any };
+      if (task === 'transcribe') {
+        appUI.addLog('model', `[Offline]: ${output.text}`);
+      }
     }
-  }, [activeMode]);
+  }, [offlineResult, appUI.addLog]);
 
   // --- Auto-Save to IndexedDB (Debounced) ---
   useEffect(() => {
-    if (!currentSessionId || logs.length === 0) return;
+    if (!appUI.currentSessionId || appUI.logs.length === 0) return;
     const saveTimer = setTimeout(() => {
       const session = {
-        id: currentSessionId,
-        startTime: new Date(parseInt(currentSessionId)),
+        id: appUI.currentSessionId as string,
+        startTime: new Date(parseInt(appUI.currentSessionId as string)),
         endTime: new Date(),
-        mode: activeMode,
-        targetLanguage: settings.targetLanguage,
-        logs: logs,
-        speakerRegistry: speakerRegistry
+        mode: appUI.activeMode,
+        targetLanguage: appUI.settings.targetLanguage,
+        logs: appUI.logs,
+        speakerRegistry: appUI.speakerRegistry
       };
-      saveSession(session, vaultKey).catch(err => {
+      saveSession(session, appUI.vaultKey).catch(err => {
+        // Essential error logging
         console.error("Failed to auto-save session:", err);
       });
     }, 2000);
     return () => clearTimeout(saveTimer);
-  }, [logs, currentSessionId, activeMode, settings.targetLanguage, speakerRegistry, vaultKey]);
+  }, [appUI.logs, appUI.currentSessionId, appUI.activeMode, appUI.settings.targetLanguage, appUI.speakerRegistry, appUI.vaultKey]);
 
-  if (!apiKey) {
+  if (!appUI.apiKey) {
     return (
       <div className="flex flex-col h-screen animate-ambient text-slate-200 items-center justify-center p-6 text-center">
         <div className="glass-panel p-10 rounded-3xl shadow-2xl max-w-sm w-full flex flex-col items-center">
-          <div className="w-20 h-20 bg-blue-600/20 rounded-full flex items-center justify-center mb-6 border border-blue-500/30">
-            <Key size={40} className="text-blue-400" />
+          <div className="w-20 h-20 bg-brand-600/20 rounded-full flex items-center justify-center mb-6 border border-brand-500/30">
+            <Key size={40} className="text-brand-400" />
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">ListeningProject</h1>
           <p className="text-slate-400 mb-8 text-xs leading-relaxed">Secure connection required.</p>
-          <button onClick={handleConnectApiKey} className="w-full px-6 py-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-2xl transition-all shadow-lg shadow-blue-900/40 flex items-center justify-center gap-2 mb-8">
+          <button onClick={appUI.handleConnectApiKey} className="w-full px-6 py-4 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-2xl transition-all shadow-lg shadow-brand-900/40 flex items-center justify-center gap-2 mb-8">
             <Key size={18} /> Connect Google AI Studio
           </button>
           <div className="w-full border-t border-white/5 pt-8">
             <p className="text-[10px] text-slate-500 mb-4 uppercase tracking-widest font-bold">Manual API Key</p>
             <div className="flex gap-2">
-              <input type="password" value={manualKey} onChange={(e) => setManualKey(e.target.value)} placeholder="Paste Key here..." className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:outline-none" />
-              <button onClick={handleSaveManualKey} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors">Save</button>
+              <input type="password" value={appUI.manualKey} onChange={(e) => appUI.setManualKey(e.target.value)} placeholder="Paste Key here..." className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:outline-none" />
+              <button onClick={appUI.handleSaveManualKey} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors">Save</button>
             </div>
           </div>
         </div>
@@ -380,100 +169,97 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col h-screen animate-ambient text-slate-200 safe-area-inset overflow-hidden selection:bg-blue-500/30">
+    <div className="flex flex-col h-screen animate-ambient text-slate-200 safe-area-inset overflow-hidden selection:bg-brand-500/30">
       <PocketModeOverlay
-        isActive={isPocketMode}
-        onUnlock={() => setIsPocketMode(false)}
+        isActive={appUI.isPocketMode}
+        onUnlock={() => appUI.setIsPocketMode(false)}
         statusText={isRecording ? `ListeningProject Live: ${connectedMics} Sensors Active` : 'ListeningProject Standby'}
       />
 
       <AppHeader
-        connectedMics={connectedMics}
-        activeMode={activeMode}
-        handleOfflineModeToggle={handleOfflineModeToggle}
-        setIsPocketMode={setIsPocketMode}
-        setShowSpeakerManager={setShowSpeakerManager}
-        setShowHistory={setShowHistory}
-        setShowVaultModal={setShowVaultModal}
-        setShowSettings={setShowSettings}
-        setShowAuthModal={setShowAuthModal}
-        vaultKey={vaultKey}
-        nodes={nodes}
-        onScan={handleScanPeers}
+        connectedMics={connectedMics || 0}
+        activeMode={appUI.activeMode}
+        handleOfflineModeToggle={appUI.handleOfflineModeToggle}
+        setShowSpeakerManager={appUI.setShowSpeakerManager}
+        setShowHistory={appUI.setShowHistory}
+        setShowVaultModal={appUI.setShowVaultModal}
+        setShowSettings={appUI.setShowSettings}
+        setShowAuthModal={appUI.setShowAuthModal}
+        vaultKey={appUI.vaultKey}
+        nodes={appUI.nodes}
       />
 
       <main className="flex-1 flex flex-col relative overflow-hidden">
         <ChatList
-          logs={logs}
-          showTranscript={showTranscript}
-          speakerRegistry={speakerRegistry}
+          logs={appUI.logs}
+          showTranscript={appUI.showTranscript}
+          speakerRegistry={appUI.speakerRegistry}
           getSpeakerColor={getSpeakerColor}
           getSpeakerInitials={getSpeakerInitials}
         />
 
         <ControlPanel
           isRecording={isRecording}
-          activeMode={activeMode}
-          setActiveMode={setActiveMode}
+          activeMode={appUI.activeMode}
+          setActiveMode={appUI.setActiveMode}
           analyserNode={analyserNode}
           offlineStatus={offlineStatus}
-          settings={settings}
-          setSettings={setSettings}
+          settings={appUI.settings}
+          setSettings={appUI.setSettings}
           toggleRecording={toggleRecording}
-          showTranscript={showTranscript}
-          setShowTranscript={setShowTranscript}
+          showTranscript={appUI.showTranscript}
+          setShowTranscript={appUI.setShowTranscript}
         />
       </main>
 
-      {showSpatialMap && (
+      {appUI.showSpatialMap && (
         <SpatialMap
-          nodes={nodes}
-          onClose={() => setShowSpatialMap(false)}
+          nodes={appUI.nodes}
+          onClose={() => appUI.setShowSpatialMap(false)}
         />
       )}
 
       <ModalsLayer
-        showSpeakerManager={showSpeakerManager}
-        setShowSpeakerManager={setShowSpeakerManager}
-        speakerRegistry={speakerRegistry}
-        renameSpeaker={renameSpeaker}
-        deleteSpeaker={deleteSpeaker}
-        logs={logs}
-        showSettings={showSettings}
-        setShowSettings={setShowSettings}
-        settings={settings}
-        setSettings={setSettings}
-        handleExport={handleExport}
-        handleImportData={handleImportData}
-        handleClearData={handleClearData}
-        storageUsage={storageUsage}
-        deferredPrompt={deferredPrompt}
+        showSpeakerManager={appUI.showSpeakerManager}
+        setShowSpeakerManager={appUI.setShowSpeakerManager}
+        speakerRegistry={appUI.speakerRegistry}
+        renameSpeaker={appUI.renameSpeaker}
+        deleteSpeaker={appUI.deleteSpeaker}
+        logs={appUI.logs}
+        showSettings={appUI.showSettings}
+        setShowSettings={appUI.setShowSettings}
+        settings={appUI.settings}
+        setSettings={appUI.setSettings}
+        handleExport={appUI.handleExport}
+        handleImportData={appUI.handleImportData}
+        handleClearData={appUI.handleClearData}
+        storageUsage={appUI.storageUsage}
+        deferredPrompt={appUI.deferredPrompt}
         handleInstallApp={handleInstallApp}
-        showOfflineWarning={showOfflineWarning}
-        setShowOfflineWarning={setShowOfflineWarning}
-        setActiveMode={setActiveMode}
-        showHistory={showHistory}
-        setShowHistory={setShowHistory}
-        vaultKey={vaultKey}
-        onSelectSession={handleSelectSession}
-        showVaultModal={showVaultModal}
-        setShowVaultModal={setShowVaultModal}
-        setVaultKey={setVaultKey}
+        showOfflineWarning={appUI.showOfflineWarning}
+        setShowOfflineWarning={appUI.setShowOfflineWarning}
+        setActiveMode={appUI.setActiveMode}
+        showHistory={appUI.showHistory}
+        setShowHistory={appUI.setShowHistory}
+        vaultKey={appUI.vaultKey}
+        onSelectSession={appUI.handleSelectSession}
+        showVaultModal={appUI.showVaultModal}
+        setShowVaultModal={appUI.setShowVaultModal}
+        setVaultKey={appUI.setVaultKey}
       />
 
       <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
+        isOpen={appUI.showAuthModal}
+        onClose={() => appUI.setShowAuthModal(false)}
       />
 
-      {/* Floating Scan for Peers Button */}
-      {activeMode !== AppMode.LOCKED && (
+      {appUI.activeMode !== AppMode.LOCKED && (
         <button
-          onClick={handleScanPeers}
-          className={`fixed bottom-8 left-8 p-4 rounded-2xl transition-all z-20 shadow-2xl glass-panel border border-white/10 ${nodes.some(n => n.status === 'online' || n.status === 'connected') ? 'bg-blue-600/20 text-blue-400 border-blue-500/30' : 'hover:bg-white/5 text-slate-400 hover:text-white'}`}
+          onClick={appUI.handleScanPeers}
+          className={`fixed bottom-8 left-8 p-4 rounded-2xl transition-all z-20 shadow-2xl glass-panel border border-white/10 ${appUI.nodes.some((n: PeerNode) => n.status === 'online' || n.status === 'connected') ? 'bg-brand-600/20 text-brand-400 border-brand-500/30' : 'hover:bg-white/5 text-slate-400 hover:text-white'}`}
           title="Scan for Peers"
         >
-          <Wifi size={24} className={nodes.some(n => n.status === 'online' || n.status === 'connected') ? 'animate-pulse' : ''} />
+          <Wifi size={24} className={appUI.nodes.some((n: PeerNode) => n.status === 'online' || n.status === 'connected') ? 'animate-pulse' : ''} />
         </button>
       )}
     </div>

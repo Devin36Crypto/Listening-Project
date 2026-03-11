@@ -1,10 +1,12 @@
-import React from 'react';
-import SpeakerManagerModal from './SpeakerManagerModal';
-import SettingsModal from './SettingsModal';
-import OfflineWarningModal from './OfflineWarningModal';
-import HistoryModal from './HistoryModal';
-import VaultKeyModal from './VaultKeyModal';
+import React, { Suspense, lazy } from 'react';
 import { AppMode, Settings, LogMessage } from '../types';
+
+// Lazy load modals for better bundle splitting
+const SpeakerManagerModal = lazy(() => import('./SpeakerManagerModal'));
+const SettingsModal = lazy(() => import('./SettingsModal'));
+const OfflineWarningModal = lazy(() => import('./OfflineWarningModal'));
+const HistoryModal = lazy(() => import('./HistoryModal'));
+const VaultKeyModal = lazy(() => import('./VaultKeyModal'));
 
 interface ModalsLayerProps {
     showSpeakerManager: boolean;
@@ -70,7 +72,7 @@ const ModalsLayer: React.FC<ModalsLayerProps> = ({
     setVaultKey
 }) => {
     return (
-        <>
+        <Suspense fallback={null}>
             <SpeakerManagerModal
                 isOpen={showSpeakerManager}
                 onClose={() => setShowSpeakerManager(false)}
@@ -117,7 +119,7 @@ const ModalsLayer: React.FC<ModalsLayerProps> = ({
                 currentKey={vaultKey}
                 onSaveKey={setVaultKey}
             />
-        </>
+        </Suspense>
     );
 };
 

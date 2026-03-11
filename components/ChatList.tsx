@@ -38,17 +38,9 @@ const ChatList: React.FC<ChatListProps> = ({
     }
 
     if (logs.length === 0) {
-        return (
-            <div className="h-full flex flex-col items-center justify-start pt-32 text-slate-500 space-y-4">
-                <div className="w-20 h-20 rounded-full bg-slate-800/50 flex items-center justify-center mb-2">
-                    <Search size={32} className="opacity-50" />
-                </div>
-                <p className="text-center max-w-xs text-sm">
-                    <b>System Online.</b><br />Sensors are ready.<br />Listening for speakers...
-                </p>
-            </div>
-        );
+        return null;
     }
+
 
     return (
         <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-32">

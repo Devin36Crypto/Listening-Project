@@ -12,28 +12,25 @@ export default {
     extend: {
       colors: {
         'brand': {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6', // Brand Blue
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
-          950: '#172554',
+          50: '#f0fdff',
+          100: '#e0faff',
+          200: '#bbf6ff',
+          300: '#7ef0ff',
+          400: '#33e8ff',
+          500: '#00e5ff', // Hyper Cyan
+          600: '#00b8cc',
+          700: '#008b99',
+          800: '#006673',
+          900: '#004a54',
+          950: '#00292f',
         },
         'accent': {
-          purple: '#8b5cf6',
           emerald: '#10b981',
           orange: '#f97316',
           rose: '#f43f5e',
         },
-        'premium': {
-          zinc: '#09090b',
-          slate: '#0f172a',
-        }
+        'premium-zinc': '#09090b',
+        'premium-slate': '#0f172a',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
