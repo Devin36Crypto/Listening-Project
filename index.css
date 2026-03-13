@@ -13,7 +13,7 @@
 }
 
 body {
-  @apply bg-[#020617] text-slate-100 antialiased overflow-hidden selection:bg-blue-500/30;
+  @apply bg-[#020617] text-slate-100 antialiased overflow-hidden selection:bg-brand-500/30;
   padding-top: var(--safe-area-inset-top);
   padding-bottom: var(--safe-area-inset-bottom);
 }
@@ -40,12 +40,12 @@ body {
 }
 
 .mic-glow {
-  box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.2);
   @apply transition-all duration-300;
 }
 
 .mic-glow:hover {
-  box-shadow: 0 0 30px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 0 30px rgba(0, 229, 255, 0.4);
   @apply scale-105;
 }
 
@@ -70,7 +70,7 @@ body {
 .premium-card::after {
   content: '';
   @apply absolute inset-0 opacity-0 transition-opacity duration-500;
-  background: radial-gradient(600px circle at var(--mouse-x) var(--mouse-y), rgba(59, 130, 246, 0.15), transparent 40%);
+  background: radial-gradient(600px circle at var(--mouse-x) var(--mouse-y), rgba(0, 229, 255, 0.15), transparent 40%);
 }
 
 .premium-card:hover::after {

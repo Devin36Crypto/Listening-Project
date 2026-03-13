@@ -100,7 +100,7 @@ export const getSessions = async (vaultKey?: string | null, limit = 50, offset =
                             processed.startTime = new Date(processed.startTime);
                             if (processed.endTime) processed.endTime = new Date(processed.endTime);
                             if (processed.logs) {
-                                processed.logs.forEach((log: any) => {
+                                processed.logs.forEach((log) => {
                                     if (log.timestamp) log.timestamp = new Date(log.timestamp);
                                 });
                             }

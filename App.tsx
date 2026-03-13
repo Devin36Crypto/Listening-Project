@@ -42,7 +42,7 @@ const App: React.FC = () => {
     if (appUI.activeMode === AppMode.LOCKED && subIsPro) {
       appUI.setActiveMode(AppMode.LIVE_TRANSLATOR);
     }
-  }, [appUI.activeMode, subIsPro, appUI.setActiveMode]);
+  }, [appUI, subIsPro]);
 
   // --- PWA & UI Effects ---
   useEffect(() => {
@@ -56,12 +56,13 @@ const App: React.FC = () => {
 
   const handleInstallApp = useCallback(async () => {
     if (!appUI.deferredPrompt) return;
-    appUI.deferredPrompt.prompt();
-    const { outcome } = await appUI.deferredPrompt.userChoice;
+    const promptEvent = appUI.deferredPrompt as unknown as BeforeInstallPromptEvent;
+    await promptEvent.prompt();
+    const { outcome } = await promptEvent.userChoice;
     if (outcome === 'accepted') {
       appUI.setDeferredPrompt(null);
     }
-  }, [appUI.deferredPrompt]);
+  }, [appUI]);
 
   useEffect(() => {
     if (appUI.showSettings) {
@@ -111,17 +112,17 @@ const App: React.FC = () => {
         startSession();
       }
     }
-  }, [isRecording, appUI.activeMode, stopOfflineRecording, stopSession, startOfflineRecording, startSession, appUI]);
+  }, [isRecording, stopOfflineRecording, stopSession, startOfflineRecording, startSession, appUI]);
 
   // --- Offline Result Handling ---
   useEffect(() => {
     if (offlineResult) {
-      const { task, output } = offlineResult as { task: string; output: any };
+      const { task, output } = offlineResult as { task: string; output: { text: string } };
       if (task === 'transcribe') {
         appUI.addLog('model', `[Offline]: ${output.text}`);
       }
     }
-  }, [offlineResult, appUI.addLog]);
+  }, [offlineResult, appUI]);
 
   // --- Auto-Save to IndexedDB (Debounced) ---
   useEffect(() => {
@@ -142,7 +143,7 @@ const App: React.FC = () => {
       });
     }, 2000);
     return () => clearTimeout(saveTimer);
-  }, [appUI.logs, appUI.currentSessionId, appUI.activeMode, appUI.settings.targetLanguage, appUI.speakerRegistry, appUI.vaultKey]);
+  }, [appUI, appUI.logs, appUI.currentSessionId, appUI.activeMode, appUI.settings.targetLanguage, appUI.speakerRegistry, appUI.vaultKey]);
 
   if (!appUI.apiKey) {
     return (

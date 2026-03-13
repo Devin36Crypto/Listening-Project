@@ -44,7 +44,7 @@ export function useAudioSession(
     const audioContextOutput = useRef<AudioContext | null>(null);
     const activeStreamsRef = useRef<MediaStream[]>([]);
     const workletNodeRef = useRef<AudioWorkletNode | null>(null);
-    const sessionPromiseRef = useRef<Promise<any> | null>(null);
+    const sessionPromiseRef = useRef<Promise<unknown> | null>(null);
     const nextStartTimeRef = useRef<number>(0);
     const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
     const wakeLockRef = useRef<WakeLockSentinel | null>(null);
@@ -100,21 +100,22 @@ export function useAudioSession(
         }
     }, []);
 
-    const handleError = useCallback((err: any, context: string) => {
-        console.error(`AudioSession Error [${context}]:`, err);
+    const handleError = useCallback((err: Error | unknown, context: string) => {
+        const error = err instanceof Error ? err : new Error(String(err));
+        console.error(`AudioSession Error [${context}]:`, error);
         let msg = 'Neural synchronization failure.';
 
-        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError' || err.message === 'PermissionDenied') {
+        if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError' || error.message === 'PermissionDenied') {
             msg = 'Microphone access denied. Check browser permissions.';
-        } else if (err.message === 'No audio sensors available.') {
+        } else if (error.message === 'No audio sensors available.') {
             msg = 'No audio input sensors detected.';
-        } else if (err.message?.includes('API_KEY')) {
+        } else if (error.message?.includes('API_KEY')) {
             msg = 'Security token invalid or missing.';
         } else if (context === 'session') {
             msg = 'Connection to neural engine disrupted.';
         }
 
-        addLog('system', `${msg} (${err.message || 'Unknown'})`, true);
+        addLog('system', `${msg} (${error.message || 'Unknown'})`, true);
         setIsRecording(false);
         releaseWakeLock();
         disableBackgroundMode();
@@ -142,7 +143,7 @@ export function useAudioSession(
                     activeStreamsRef.current.push(stream);
                     ctx.createMediaStreamSource(stream).connect(merger);
                     return true;
-                } catch (e) {
+                } catch {
                     // Log failure for this specific device but don't halt the whole scan
                     console.warn(`Sensor access failed: ${device.label || device.deviceId}`);
                     return false;
@@ -157,8 +158,8 @@ export function useAudioSession(
                 activeStreamsRef.current.push(stream);
                 ctx.createMediaStreamSource(stream).connect(merger);
                 streamCount = 1;
-            } catch (e) {
-                throw new Error('No audio sensors available.');
+            } catch (innerError) {
+                throw new Error('No audio sensors available.', { cause: innerError });
             }
         }
 
@@ -169,8 +170,9 @@ export function useAudioSession(
 
         try {
             await ctx.audioWorklet.addModule(audioProcessorUrl);
-        } catch (e: any) {
-            if (!e.message?.includes('already registered')) throw e;
+        } catch (e) {
+            const err = e as Error;
+            if (!err.message?.includes('already registered')) throw err;
         }
 
         const workletNode = new AudioWorkletNode(ctx, 'audio-processor');
@@ -196,7 +198,7 @@ export function useAudioSession(
 
         // Clear audio sources to prevent memory leaks
         sourcesRef.current.forEach(source => {
-            try { source.stop(); source.disconnect(); } catch (e) { }
+            try { source.stop(); source.disconnect(); } catch { /* Ignore stop errors */ }
         });
         sourcesRef.current.clear();
 
@@ -215,7 +217,8 @@ export function useAudioSession(
             await requestWakeLock();
             enableBackgroundMode();
 
-            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+            // @ts-expect-error webkitAudioContext is legacy
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
             audioContextInput.current = new AudioContextClass({ sampleRate: INPUT_SAMPLE_RATE });
             audioContextOutput.current = new AudioContextClass({ sampleRate: OUTPUT_SAMPLE_RATE });
 
@@ -245,11 +248,14 @@ export function useAudioSession(
                         workletNode.port.onmessage = (e) => {
                             if (!isRecording) return;
                             const base64 = createPcmBase64(e.data);
-                            sessionPromiseRef.current?.then(session => {
-                                if (isRecording) {
-                                    session.sendRealtimeInput({
-                                        media: { mimeType: `audio/pcm;rate=${INPUT_SAMPLE_RATE}`, data: base64 }
-                                    });
+                            sessionPromiseRef.current?.then((session) => {
+                                if (isRecording && session) {
+                                    const s = session as unknown as { sendRealtimeInput: (arg: unknown) => void };
+                                    if (typeof s.sendRealtimeInput === 'function') {
+                                        s.sendRealtimeInput({
+                                            media: { mimeType: `audio/pcm;rate=${INPUT_SAMPLE_RATE}`, data: base64 }
+                                        });
+                                    }
                                 }
                             });
                         };
@@ -316,7 +322,8 @@ export function useAudioSession(
             addLog('system', 'Activating Offline Matrix...');
             await requestWakeLock();
             enableBackgroundMode();
-            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+            // @ts-expect-error webkitAudioContext is legacy
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
             audioContextInput.current = new AudioContextClass({ sampleRate: INPUT_SAMPLE_RATE });
             await audioContextInput.current.resume();
             const workletNode = await initializeMultiInputAudio(audioContextInput.current);

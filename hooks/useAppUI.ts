@@ -1,7 +1,7 @@
-import { useState, useCallback, useEffect } from 'react';
-import { AppMode, LogMessage, Settings, PeerNode, BeforeInstallPromptEvent } from '../types';
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import { AppMode, LogMessage, Settings, PeerNode, BeforeInstallPromptEvent, Session } from '../types';
 import { discoveryService } from '../services/DiscoveryService';
-import { saveSession, importSessions, clearAllSessions, getStorageUsage } from '../services/db';
+import { importSessions, clearAllSessions, getStorageUsage } from '../services/db';
 import { initSubscriptions, getDetailedSubscriptionStatus } from '../services/subscriptions';
 
 declare global {
@@ -42,6 +42,38 @@ export function useAppUI() {
     const [nodes, setNodes] = useState<PeerNode[]>([]);
     const [speakerRegistry, setSpeakerRegistry] = useState<Record<string, string>>({});
 
+    const handleConnectApiKey = useCallback(async () => {
+        if (window.aistudio && window.aistudio.openSelectKey) {
+            await window.aistudio.openSelectKey();
+            setApiKey('STUDIO_MANAGED');
+        } else {
+            alert("API Key selection is not available in this environment. Please set VITE_GEMINI_API_KEY in .env");
+        }
+    }, []);
+
+    const initializeApiKey = useCallback(async () => {
+        let key = import.meta.env.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : null);
+        if (!key) {
+            key = localStorage.getItem('gemini_api_key');
+        }
+        if (!key && window.aistudio?.hasSelectedApiKey) {
+            const hasStudioKey = await window.aistudio.hasSelectedApiKey();
+            if (hasStudioKey) {
+                setApiKey('STUDIO_MANAGED');
+                return;
+            }
+        }
+        if (key) {
+            setApiKey(key);
+        } else {
+            if (window.aistudio?.openSelectKey) {
+                handleConnectApiKey();
+            } else {
+                setShowVaultModal(true);
+            }
+        }
+    }, [handleConnectApiKey]);
+
     // --- initialization effect ---
     useEffect(() => {
         let lastUpdate = 0;
@@ -53,7 +85,7 @@ export function useAppUI() {
             }
         });
 
-        const initBackend = async () => {
+        const init = async () => {
             try {
                 await initSubscriptions();
                 const sub = await getDetailedSubscriptionStatus();
@@ -63,11 +95,10 @@ export function useAppUI() {
             } catch (err) {
                 console.error("Failed to initialize RevenueCat:", err);
             }
+            await initializeApiKey();
         };
-        initBackend();
-        // eslint-disable-next-line @typescript-eslint/no-use-before-define
-        initializeApiKey();
-    }, []);
+        init();
+    }, [initializeApiKey]);
 
     // --- handlers ---
     const handleScanPeers = useCallback(() => {
@@ -148,7 +179,7 @@ export function useAppUI() {
         addLog('system', 'Backup exported successfully.');
     }, [settings, speakerRegistry, logs, addLog]);
 
-    const handleSelectSession = useCallback((session: any) => {
+    const handleSelectSession = useCallback((session: Session) => {
         if (session.mode === AppMode.LOCKED) {
             setShowHistory(false);
             setShowVaultModal(true);
@@ -162,37 +193,9 @@ export function useAppUI() {
         setShowHistory(false);
     }, []);
 
-    const handleConnectApiKey = useCallback(async () => {
-        if (window.aistudio && window.aistudio.openSelectKey) {
-            await window.aistudio.openSelectKey();
-            setApiKey('STUDIO_MANAGED');
-        } else {
-            alert("API Key selection is not available in this environment. Please set VITE_GEMINI_API_KEY in .env");
-        }
-    }, []);
 
-    const initializeApiKey = useCallback(async () => {
-        let key = import.meta.env.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : null);
-        if (!key) {
-            key = localStorage.getItem('gemini_api_key');
-        }
-        if (!key && window.aistudio?.hasSelectedApiKey) {
-            const hasStudioKey = await window.aistudio.hasSelectedApiKey();
-            if (hasStudioKey) {
-                setApiKey('STUDIO_MANAGED');
-                return;
-            }
-        }
-        if (key) {
-            setApiKey(key);
-        } else {
-            if (window.aistudio?.openSelectKey) {
-                handleConnectApiKey();
-            } else {
-                setShowVaultModal(true);
-            }
-        }
-    }, [handleConnectApiKey]);
+
+
 
     const handleSaveManualKey = useCallback(() => {
         if (manualKey.trim().length > 10) {
@@ -212,7 +215,7 @@ export function useAppUI() {
         }
     }, [activeMode]);
 
-    return {
+    return useMemo(() => ({
         activeMode, setActiveMode,
         isPocketMode, setIsPocketMode,
         showTranscript, setShowTranscript,
@@ -245,5 +248,14 @@ export function useAppUI() {
         initializeApiKey,
         handleSaveManualKey,
         handleOfflineModeToggle
-    };
+    }), [
+        activeMode, isPocketMode, showTranscript, logs, showSettings,
+        showAuthModal, showOfflineWarning, showHistory, showSpeakerManager,
+        currentSessionId, apiKey, manualKey, settings, storageUsage,
+        vaultKey, showVaultModal, deferredPrompt, showSpatialMap, nodes,
+        speakerRegistry, handleScanPeers, addLog, handleImportData,
+        handleClearData, renameSpeaker, deleteSpeaker, handleExport,
+        handleSelectSession, handleConnectApiKey, initializeApiKey,
+        handleSaveManualKey, handleOfflineModeToggle
+    ]);
 }
